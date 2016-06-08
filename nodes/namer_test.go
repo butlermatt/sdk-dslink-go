@@ -37,6 +37,7 @@ func TestDecodeName(t *testing.T) {
 		if got != c.decoded {
 			t.Errorf("DecodeName(%q) == %q, want %q", c.encoded, got, c.decoded)
 		}
+
 	}
 
 	var failCases = []string{`%`, `%AZ`}
