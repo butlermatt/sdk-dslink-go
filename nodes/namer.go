@@ -10,7 +10,7 @@ import (
 // BannedChars are characters which may not appear in a node path.
 var BannedChars = [...]rune{
 	'%',
-	'.',
+	//'.', // No longer banned
 	'/',
 	'\\',
 	'?',
@@ -21,6 +21,8 @@ var BannedChars = [...]rune{
 	'>',
 	'$',
 	'@',
+	'\'',
+	'"',
 }
 
 // EncodeName accepts a string input and will automatically escape any invalid
