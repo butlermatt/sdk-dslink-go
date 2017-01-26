@@ -16,6 +16,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const pingTime = 45 * time.Second
+
 type dsResp struct {
 	Id 	  string `json:"id"`
 	PublicKey string `json:"publicKey"`
@@ -41,6 +43,7 @@ type client struct {
 	cPriv 	 crypto.PrivateKey
 	in       chan string
 	out	 chan string
+	ping     *time.Timer
 }
 
 // Close will force the Websocket on the client to be closed.
@@ -123,7 +126,6 @@ func (c *client) handleConnections() {
 		}
 	}()
 
-	tick := time.Tick(30 * time.Second)
 	c.wsClient.WriteMessage(websocket.TextMessage, []byte("{}"))
 	for {
 		select {
@@ -132,10 +134,15 @@ func (c *client) handleConnections() {
 			fmt.Printf("Received message: %s\n", s)
 		case o := <-c.out:
 			c.wsClient.WriteMessage(websocket.TextMessage, []byte(o))
-		case <- tick:
+			if !c.ping.Stop() {
+				<-c.ping.C
+			}
+			c.ping.Reset(pingTime)
+		case <- c.ping.C:
 			c.msgId++
 			m := fmt.Sprintf("{\"msg\": %d}", c.msgId)
 			c.wsClient.WriteMessage(websocket.TextMessage, []byte(m))
+			c.ping.Reset(pingTime)
 		}
 	}
 }
@@ -156,9 +163,13 @@ func Dial(addr, prefix string) (*client, error) {
 
 	// TODO: The keys should be managed outside of the client and
 	// passed in as needed
-	c.cPriv, err = c.keyMaker.GenerateKey(rand.Reader)
+	c.cPriv, err = crypto.LoadKey("")
 	if err != nil {
-		return nil, fmt.Errorf("Unable to generate key: %v", err)
+		c.cPriv, err = c.keyMaker.GenerateKey(rand.Reader)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to generate key: %v", err)
+		}
+		_ = crypto.SaveKey(c.cPriv,"")
 	}
 	c.dsId = c.cPriv.DsId(prefix)
 
@@ -173,6 +184,7 @@ func Dial(addr, prefix string) (*client, error) {
 	}
 
 	c.wsClient = conn
+	c.ping = time.NewTimer(pingTime)
 	c.in = make(chan string)
 	c.out = make(chan string)
 
