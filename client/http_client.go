@@ -32,7 +32,7 @@ type dsResp struct {
 	Format 	  string `json:"format"`
 }
 
-type client struct {
+type httpClient struct {
 	dsId	 string
 	msgId	 uint32
 	reqId	 uint32
@@ -46,14 +46,14 @@ type client struct {
 	ping     *time.Timer
 }
 
-// Close will force the Websocket on the client to be closed.
-func (c *client) Close() {
+// Close will force the Websocket on the httpClient to be closed.
+func (c *httpClient) Close() {
 	if c.wsClient != nil {
 		_ = c.wsClient.Close()
 	}
 }
 
-func (c *client) getWsConfig() (*dsResp, error) {
+func (c *httpClient) getWsConfig() (*dsResp, error) {
 	u, _ := url.Parse(c.rawUrl.String())
 	q := u.Query()
 	q.Add("dsId", c.dsId)
@@ -80,7 +80,7 @@ func (c *client) getWsConfig() (*dsResp, error) {
 	return dr, nil
 }
 
-func (c *client) connectWs(config *dsResp) (*websocket.Conn, error) {
+func (c *httpClient) connectWs(config *dsResp) (*websocket.Conn, error) {
 	sPub, err := c.keyMaker.UnmarshalPublic(config.TempKey)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to parse server key: %s\nError: %s", config.TempKey, err)
@@ -109,7 +109,7 @@ func (c *client) connectWs(config *dsResp) (*websocket.Conn, error) {
 	return conn, nil
 }
 
-func (c *client) handleConnections() {
+func (c *httpClient) handleConnections() {
 	go func() {
 		for {
 			mt, p, err := c.wsClient.ReadMessage()
@@ -148,20 +148,20 @@ func (c *client) handleConnections() {
 }
 
 // Dial will attempt to connect a link with the specified prefix to the specified address.
-// Returns an error if connection handshake fails. Otherwise returns the connected client.
-func Dial(addr, prefix string) (*client, error) {
+// Returns an error if connection handshake fails. Otherwise returns the connected httpClient.
+func Dial(addr, prefix string) (*httpClient, error) {
 	u, err := url.Parse(addr)
 	if err != nil {
 		return nil, err
 	}
 
-	c := &client{
+	c := &httpClient{
 		keyMaker: crypto.NewECDH(),
 		htClient: &http.Client{Timeout: time.Second * 60},
 		rawUrl: u,
 	}
 
-	// TODO: The keys should be managed outside of the client and
+	// TODO: The keys should be managed outside of the httpClient and
 	// passed in as needed
 	c.cPriv, err = crypto.LoadKey("")
 	if err != nil {
