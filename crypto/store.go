@@ -1,8 +1,8 @@
 package crypto
 
 import (
-	"io/ioutil"
 	"fmt"
+	"io/ioutil"
 )
 
 // LoadKey will try to load the public and private key configuration from disk.
@@ -26,7 +26,7 @@ func LoadKey(path string) (PrivateKey, error) {
 // SaveKey will attempt to save the specified private key to the specified file.
 // If path is not specified, then it will use the default .dslink.key.
 // This function will return an error on failure.
-func SaveKey(key PrivateKey, path string) (error) {
+func SaveKey(key PrivateKey, path string) error {
 	km := NewECDH()
 
 	if path == "" {

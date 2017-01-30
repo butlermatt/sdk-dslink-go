@@ -5,6 +5,7 @@ type message struct {
 	Ack  int32      `json:"ack"`
 	Reqs []request  `json:"requests"`
 	Resp []response `json:"responses"`
+	Salt string     `json:"salt"`
 }
 
 type request struct {
@@ -17,7 +18,7 @@ type response struct {
 	Rid     int32         `json:"rid"`
 	Stream  string        `json:"stream"`
 	Updates []interface{} `json:"updates"`
-	Error 	msgErr        `json:"error"`
+	Error   msgErr        `json:"error"`
 }
 
 type msgErr struct {

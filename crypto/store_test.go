@@ -1,9 +1,9 @@
 package crypto
 
 import (
-	"testing"
 	"crypto/rand"
 	"os"
+	"testing"
 )
 
 func TestSaveKey(t *testing.T) {

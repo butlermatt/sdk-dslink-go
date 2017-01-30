@@ -3,8 +3,8 @@ package link
 import (
 	"flag"
 	"fmt"
-	"path/filepath"
 	"os"
+	"path/filepath"
 )
 
 const brokerDefault = "http://127.0.0.1:8080/conn"
@@ -14,17 +14,18 @@ var linkName string
 var home string
 var token string
 var basePath string
+
 //var logFile string
 var help bool
 
 func init() {
 	const (
-		helpUsage = "Display this help message"
+		helpUsage   = "Display this help message"
 		brokerUsage = "Broker `URL`"
-		homeUsage = "Connect to user `home` space"
-		nameUsage = "Link `Name`"
-		tokenUsage = "Authorization `Token`"
-		baseUsage = "Root `path` of the DSLink"
+		homeUsage   = "Connect to user `home` space"
+		nameUsage   = "Link `Name`"
+		tokenUsage  = "Authorization `Token`"
+		baseUsage   = "Root `path` of the DSLink"
 		//logfUsage = "Output file for logger"
 	)
 

@@ -35,12 +35,12 @@ type Link interface {
 type Config struct {
 	isResponder bool
 	isRequester bool
-	autoInit bool
-	broker string
-	name string
-	home string
-	token string
-	rootPath string
+	autoInit    bool
+	broker      string
+	name        string
+	home        string
+	token       string
+	rootPath    string
 	//logFile string
 }
 
@@ -67,11 +67,11 @@ func NewLink(prefix string, options ...func(*Config)) Link {
 
 type link struct {
 	conf Config
-	cl *httpClient
+	cl   *httpClient
 }
 
 func (l *link) Init() {
-	if l.conf.name[len(l.conf.name) - 1] != '-' {
+	if l.conf.name[len(l.conf.name)-1] != '-' {
 		l.conf.name += "-"
 	}
 	// TODO:

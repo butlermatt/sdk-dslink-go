@@ -1,14 +1,14 @@
 package link
 
 import (
-	"net/http"
-	"net/url"
-	"time"
+	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"crypto/rand"
+	"net/http"
+	"net/url"
 	"strings"
-	"encoding/json"
+	"time"
 )
 
 import (
@@ -19,33 +19,33 @@ import (
 const pingTime = 45 * time.Second
 
 type dsResp struct {
-	Id 	  string `json:"id"`
+	Id        string `json:"id"`
 	PublicKey string `json:"publicKey"`
-	WsUri 	  string `json:"wsUri"`
+	WsUri     string `json:"wsUri"`
 	HttpUri   string `json:"httpUri"`
 	Version   string `json:"version"`
 	TempKey   string `json:"tempKey"`
-	Salt 	  string `json:"salt"`
-	SaltS 	  string `json:"saltS"`
-	SaltL 	  string `json:"saltL"`
-	Path 	  string `json:"path"`
-	Format 	  string `json:"format"`
+	Salt      string `json:"salt"`
+	SaltS     string `json:"saltS"`
+	SaltL     string `json:"saltL"`
+	Path      string `json:"path"`
+	Format    string `json:"format"`
 }
 
 type httpClient struct {
-	dsId	 string
-	msgId	 uint32
-	reqId	 uint32
+	dsId     string
+	msgId    uint32
+	reqId    uint32
 	keyMaker crypto.ECDH
 	htClient *http.Client
 	rawUrl   *url.URL
-	home	 string
+	home     string
 	token    string
-	tHash	 string
+	tHash    string
 	wsClient *websocket.Conn
-	cPriv 	 crypto.PrivateKey
+	cPriv    crypto.PrivateKey
 	in       chan []byte
-	out	 chan string
+	out      chan string
 	ping     *time.Timer
 }
 
@@ -64,12 +64,12 @@ func (c *httpClient) getWsConfig() (*dsResp, error) {
 		q.Add("home", c.home)
 	}
 	if c.tHash != "" {
-		q.Add("token", c.token + c.tHash)
+		q.Add("token", c.token+c.tHash)
 	}
 	u.RawQuery = q.Encode()
 
 	// TODO: Put this in a struct!
-	values := fmt.Sprintf("{\"publicKey\": \"%s\", \"isRequester\": false, \"isResponder\": true," +
+	values := fmt.Sprintf("{\"publicKey\": \"%s\", \"isRequester\": false, \"isResponder\": true,"+
 		"\"linkData\": {}, \"version\": \"1.1.2\", \"formats\": [\"json\"], \"enableWebSocketCompression\": true}",
 		c.cPriv.PublicKey.Base64())
 	res, err := c.htClient.Post(u.String(), "application/json", strings.NewReader(values))
@@ -112,7 +112,7 @@ func (c *httpClient) connectWs(config *dsResp) (*websocket.Conn, error) {
 		q.Add("home", c.home)
 	}
 	if c.tHash != "" {
-		q.Add("token", c.token + c.tHash)
+		q.Add("token", c.token+c.tHash)
 	}
 	u.RawQuery = q.Encode()
 	u.Scheme = "ws"
@@ -138,7 +138,7 @@ func (c *httpClient) handleConnections() {
 				fmt.Println("Read error. Data is binary!?")
 				return
 			}
-			c.in<-p
+			c.in <- p
 		}
 	}()
 
@@ -163,7 +163,7 @@ func (c *httpClient) handleConnections() {
 				<-c.ping.C
 			}
 			c.ping.Reset(pingTime)
-		case <- c.ping.C:
+		case <-c.ping.C:
 			c.msgId++
 			m := fmt.Sprintf("{\"msg\": %d}", c.msgId)
 			fmt.Printf("Sending message: %s\n", m)
@@ -184,8 +184,8 @@ func dial(addr, prefix, home, token string) (*httpClient, error) {
 	c := &httpClient{
 		keyMaker: crypto.NewECDH(),
 		htClient: &http.Client{Timeout: time.Second * 60},
-		rawUrl: u,
-		home: home,
+		rawUrl:   u,
+		home:     home,
 	}
 
 	// TODO: The keys should be managed outside of the httpClient and
@@ -196,7 +196,7 @@ func dial(addr, prefix, home, token string) (*httpClient, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Unable to generate key: %v", err)
 		}
-		_ = crypto.SaveKey(c.cPriv,"")
+		_ = crypto.SaveKey(c.cPriv, "")
 	}
 	c.dsId = c.cPriv.DsId(prefix)
 
