@@ -5,7 +5,7 @@ import (
 )
 
 func TestDial(t *testing.T) {
-	c, err := Dial("http://localhost:8080/conn", "myTest-")
+	c, err := dial("http://localhost:8080/conn", "myTest-", "", "")
 
 	if err != nil {
 		t.Fatalf("Dial failed: %v", err)

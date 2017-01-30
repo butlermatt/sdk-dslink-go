@@ -164,7 +164,7 @@ func (c *httpClient) handleConnections() {
 
 // Dial will attempt to connect a link with the specified prefix to the specified address.
 // Returns an error if connection handshake fails. Otherwise returns the connected httpClient.
-func Dial(addr, prefix, home, token string) (*httpClient, error) {
+func dial(addr, prefix, home, token string) (*httpClient, error) {
 	u, err := url.Parse(addr)
 	if err != nil {
 		return nil, err
