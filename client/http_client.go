@@ -39,6 +39,9 @@ type httpClient struct {
 	keyMaker crypto.ECDH
 	htClient *http.Client
 	rawUrl   *url.URL
+	home	 string
+	token    string
+	tHash	 string
 	wsClient *websocket.Conn
 	cPriv 	 crypto.PrivateKey
 	in       chan string
@@ -57,6 +60,12 @@ func (c *httpClient) getWsConfig() (*dsResp, error) {
 	u, _ := url.Parse(c.rawUrl.String())
 	q := u.Query()
 	q.Add("dsId", c.dsId)
+	if c.home != "" {
+		q.Add("home", c.home)
+	}
+	if c.tHash != "" {
+		q.Add("token", c.token + c.tHash)
+	}
 	u.RawQuery = q.Encode()
 
 	values := fmt.Sprintf("{\"publicKey\": \"%s\", \"isRequester\": false, \"isResponder\": true," +
@@ -98,6 +107,12 @@ func (c *httpClient) connectWs(config *dsResp) (*websocket.Conn, error) {
 	q.Add("auth", auth)
 	q.Add("format", config.Format)
 	q.Add("dsId", c.dsId)
+	if c.home != "" {
+		q.Add("home", c.home)
+	}
+	if c.tHash != "" {
+		q.Add("token", c.token + c.tHash)
+	}
 	u.RawQuery = q.Encode()
 	u.Scheme = "ws"
 
@@ -149,7 +164,7 @@ func (c *httpClient) handleConnections() {
 
 // Dial will attempt to connect a link with the specified prefix to the specified address.
 // Returns an error if connection handshake fails. Otherwise returns the connected httpClient.
-func Dial(addr, prefix string) (*httpClient, error) {
+func Dial(addr, prefix, home, token string) (*httpClient, error) {
 	u, err := url.Parse(addr)
 	if err != nil {
 		return nil, err
@@ -159,6 +174,7 @@ func Dial(addr, prefix string) (*httpClient, error) {
 		keyMaker: crypto.NewECDH(),
 		htClient: &http.Client{Timeout: time.Second * 60},
 		rawUrl: u,
+		home: home,
 	}
 
 	// TODO: The keys should be managed outside of the httpClient and
@@ -172,6 +188,11 @@ func Dial(addr, prefix string) (*httpClient, error) {
 		_ = crypto.SaveKey(c.cPriv,"")
 	}
 	c.dsId = c.cPriv.DsId(prefix)
+
+	if len(token) >= 16 { // TODO: Why 16??
+		c.token = token[:16]
+		c.tHash = c.keyMaker.HashToken(c.dsId, c.token)
+	}
 
 	ret, err := c.getWsConfig()
 	if err != nil {
