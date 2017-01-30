@@ -1,6 +1,4 @@
-package client
-
-import "fmt"
+package link
 
 //import "log"
 

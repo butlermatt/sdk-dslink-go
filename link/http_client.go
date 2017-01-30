@@ -1,4 +1,4 @@
-package client
+package link
 
 import (
 	"net/http"
@@ -44,7 +44,7 @@ type httpClient struct {
 	tHash	 string
 	wsClient *websocket.Conn
 	cPriv 	 crypto.PrivateKey
-	in       chan string
+	in       chan []byte
 	out	 chan string
 	ping     *time.Timer
 }
@@ -68,6 +68,7 @@ func (c *httpClient) getWsConfig() (*dsResp, error) {
 	}
 	u.RawQuery = q.Encode()
 
+	// TODO: Put this in a struct!
 	values := fmt.Sprintf("{\"publicKey\": \"%s\", \"isRequester\": false, \"isResponder\": true," +
 		"\"linkData\": {}, \"version\": \"1.1.2\", \"formats\": [\"json\"], \"enableWebSocketCompression\": true}",
 		c.cPriv.PublicKey.Base64())
@@ -137,7 +138,7 @@ func (c *httpClient) handleConnections() {
 				fmt.Println("Read error. Data is binary!?")
 				return
 			}
-			c.in<-string(p)
+			c.in<-p
 		}
 	}()
 
@@ -147,7 +148,16 @@ func (c *httpClient) handleConnections() {
 		case s := <-c.in:
 			//TODO: Handle a received message
 			fmt.Printf("Received message: %s\n", s)
+			msg := &message{Msg: -1, Ack: -1}
+			err := json.Unmarshal(s, msg)
+			if err != nil {
+				fmt.Errorf("Error unmarshalling %s\nError: %v\n", s, err)
+			}
+			go func(m *message) {
+				fmt.Printf("Received message %+v\n", *m)
+			}(msg)
 		case o := <-c.out:
+			fmt.Printf("Sending message: %s\n", o)
 			c.wsClient.WriteMessage(websocket.TextMessage, []byte(o))
 			if !c.ping.Stop() {
 				<-c.ping.C
@@ -156,6 +166,7 @@ func (c *httpClient) handleConnections() {
 		case <- c.ping.C:
 			c.msgId++
 			m := fmt.Sprintf("{\"msg\": %d}", c.msgId)
+			fmt.Printf("Sending message: %s\n", m)
 			c.wsClient.WriteMessage(websocket.TextMessage, []byte(m))
 			c.ping.Reset(pingTime)
 		}
@@ -206,7 +217,7 @@ func dial(addr, prefix, home, token string) (*httpClient, error) {
 
 	c.wsClient = conn
 	c.ping = time.NewTimer(pingTime)
-	c.in = make(chan string)
+	c.in = make(chan []byte)
 	c.out = make(chan string)
 
 	go c.handleConnections()
