@@ -9,14 +9,16 @@ import (
 
 const brokerDefault = "http://127.0.0.1:8080/conn"
 
-var brokerAddr string
-var linkName string
-var home string
-var token string
-var basePath string
-
-//var logFile string
-var help bool
+var (
+	brokerAddr string
+	linkName   string
+	home       string
+	token      string
+	basePath   string
+	logFile    string
+	logL       bool
+	help       bool
+)
 
 func init() {
 	const (
@@ -26,7 +28,8 @@ func init() {
 		nameUsage   = "Link `Name`"
 		tokenUsage  = "Authorization `Token`"
 		baseUsage   = "Root `path` of the DSLink"
-		//logfUsage = "Output file for logger"
+		logfUsage   = "Output file for logger"
+		loglUsage   = "Enable the default logger"
 	)
 
 	flag.Usage = func() {
@@ -37,6 +40,7 @@ func init() {
 
 	flag.BoolVar(&help, "h", false, helpUsage)
 	flag.BoolVar(&help, "help", false, helpUsage)
+	flag.BoolVar(&logL, "log", false, loglUsage)
 	flag.StringVar(&brokerAddr, "broker", brokerDefault, brokerUsage)
 	flag.StringVar(&brokerAddr, "b", brokerDefault, brokerUsage)
 	flag.StringVar(&linkName, "name", "", nameUsage)
@@ -44,7 +48,7 @@ func init() {
 	flag.StringVar(&home, "home", "", homeUsage)
 	flag.StringVar(&token, "token", "", tokenUsage)
 	flag.StringVar(&basePath, "basepath", "", baseUsage)
-	//flag.StringVar(&logFile, "logfile", "", logfUsage)
+	flag.StringVar(&logFile, "logfile", "", logfUsage)
 }
 
 func parseFlags(c *Config) {
@@ -65,5 +69,6 @@ func parseFlags(c *Config) {
 	c.home = home
 	c.token = token
 	c.rootPath = basePath
-	//c.logFile = logFile
+	c.logFile = logFile
+	c.log = logL
 }

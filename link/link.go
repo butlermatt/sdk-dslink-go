@@ -1,6 +1,14 @@
 package link
 
-//import "log"
+import (
+	"os"
+	"fmt"
+)
+
+import (
+	lg "log"
+	"io/ioutil"
+)
 
 func IsRequester(c *Config) {
 	c.isRequester = true
@@ -14,13 +22,13 @@ func AutoInit(c *Config) {
 	c.autoInit = true
 }
 
-//var Log *log.Logger
+var log *lg.Logger
 
-//func Logger(l *log.Logger) func(c *Config) {
-//	return func(c *Config) {
-//		Log = l
-//	}
-//}
+func Logger(l *lg.Logger) func(c *Config) {
+	return func(c *Config) {
+		log = l
+	}
+}
 
 type Link interface {
 	// Init will initialize the link and setup the various configurations required for the link. This includes
@@ -41,7 +49,8 @@ type Config struct {
 	home        string
 	token       string
 	rootPath    string
-	//logFile string
+	logFile     string
+	log	    bool
 }
 
 func NewLink(prefix string, options ...func(*Config)) Link {
@@ -58,6 +67,14 @@ func NewLink(prefix string, options ...func(*Config)) Link {
 	// Handle Flags
 	parseFlags(&l.conf)
 
+	if l.conf.log {
+		if log == nil {
+			log = lg.New(os.Stdout, "", lg.Lshortfile)
+		}
+	} else if log == nil {
+		log = lg.New(ioutil.Discard, "", lg.Lshortfile)
+	}
+
 	if l.conf.autoInit {
 		l.Init()
 	}
@@ -68,6 +85,10 @@ func NewLink(prefix string, options ...func(*Config)) Link {
 type link struct {
 	conf Config
 	cl   *httpClient
+}
+
+type dsJson struct {
+	Config map[string]map[string]string `json:"configs"`
 }
 
 func (l *link) Init() {
@@ -90,4 +111,16 @@ func (l *link) Start() {
 
 func (l *link) Stop() {
 	l.cl.Close()
+}
+
+func (l *link) loadDsJson() {
+	if l.conf.rootPath != "" {
+		err := os.Chdir(l.conf.rootPath)
+		if err != nil {
+			fmt.Printf("Unable to load dslink.json, cannot find root path: %s\n", l.conf.rootPath)
+			return
+		}
+
+
+	}
 }

@@ -131,11 +131,11 @@ func (c *httpClient) handleConnections() {
 			mt, p, err := c.wsClient.ReadMessage()
 			if err != nil {
 				//TODO: Better logging/handling here
-				fmt.Printf("Read error! %v\n", err)
+				log.Printf("Read error! %v\n", err)
 				return
 			}
 			if mt != websocket.TextMessage {
-				fmt.Println("Read error. Data is binary!?")
+				log.Println("Read error. Data is binary!?")
 				return
 			}
 			c.in <- p
@@ -147,17 +147,17 @@ func (c *httpClient) handleConnections() {
 		select {
 		case s := <-c.in:
 			//TODO: Handle a received message
-			fmt.Printf("Received message: %s\n", s)
+			log.Printf("Received message: %s\n", s)
 			msg := &message{Msg: -1, Ack: -1}
 			err := json.Unmarshal(s, msg)
 			if err != nil {
-				fmt.Errorf("Error unmarshalling %s\nError: %v\n", s, err)
+				log.Printf("Error unmarshalling %s\nError: %v\n", s, err)
 			}
 			go func(m *message) {
-				fmt.Printf("Received message %+v\n", *m)
+				log.Printf("Received message %+v\n", *m)
 			}(msg)
 		case o := <-c.out:
-			fmt.Printf("Sending message: %s\n", o)
+			log.Printf("Sending message: %s\n", o)
 			c.wsClient.WriteMessage(websocket.TextMessage, []byte(o))
 			if !c.ping.Stop() {
 				<-c.ping.C
@@ -166,7 +166,7 @@ func (c *httpClient) handleConnections() {
 		case <-c.ping.C:
 			c.msgId++
 			m := fmt.Sprintf("{\"msg\": %d}", c.msgId)
-			fmt.Printf("Sending message: %s\n", m)
+			log.Printf("Sending message: %s\n", m)
 			c.wsClient.WriteMessage(websocket.TextMessage, []byte(m))
 			c.ping.Reset(pingTime)
 		}
