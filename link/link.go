@@ -1,14 +1,13 @@
 package link
 
 import (
+	"encoding/json"
+	"io/ioutil"
+	lg "log"
 	"os"
-	"fmt"
 )
 
-import (
-	lg "log"
-	"io/ioutil"
-)
+const dslinkJson = "dslink.json"
 
 func IsRequester(c *Config) {
 	c.isRequester = true
@@ -49,8 +48,9 @@ type Config struct {
 	home        string
 	token       string
 	rootPath    string
+	keyPath	    string
 	logFile     string
-	log	    bool
+	log         bool
 }
 
 func NewLink(prefix string, options ...func(*Config)) Link {
@@ -97,13 +97,14 @@ func (l *link) Init() {
 	}
 	// TODO:
 	// Load dslink.json
+	l.loadDsJson()
 	// load nodes.json
 }
 
 func (l *link) Start() {
 	// TODO
 	var err error
-	l.cl, err = dial(l.conf.broker, l.conf.name, l.conf.home, l.conf.token)
+	l.cl, err = dial(&l.conf)
 	if err != nil {
 		panic(err)
 	}
@@ -117,10 +118,28 @@ func (l *link) loadDsJson() {
 	if l.conf.rootPath != "" {
 		err := os.Chdir(l.conf.rootPath)
 		if err != nil {
-			fmt.Printf("Unable to load dslink.json, cannot find root path: %s\n", l.conf.rootPath)
+			log.Printf("Unable to load %s, cannot find root path: %s\n", dslinkJson, l.conf.rootPath)
 			return
 		}
+	}
+	d, err := ioutil.ReadFile(dslinkJson)
+	if err != nil {
+		log.Printf("Unable to open file: %s\nError: %v", dslinkJson, err)
+		return
+	}
 
+	ds := &dsJson{}
+	err = json.Unmarshal(d, ds)
+	if err != nil {
+		log.Printf("Unable to Unmarshal data: %s\nError:%v\n", d, err)
+		return
+	}
 
+	key := ds.Config["key"]
+	if key!= nil {
+		keyPath, ok := key["value"]
+		if ok {
+			l.conf.keyPath = keyPath
+		}
 	}
 }

@@ -154,7 +154,7 @@ func (c *httpClient) handleConnections() {
 				log.Printf("Error unmarshalling %s\nError: %v\n", s, err)
 			}
 			go func(m *message) {
-				log.Printf("Received message %+v\n", *m)
+				log.Printf("Received message: %+v\n", *m)
 			}(msg)
 		case o := <-c.out:
 			log.Printf("Sending message: %s\n", o)
@@ -175,8 +175,8 @@ func (c *httpClient) handleConnections() {
 
 // Dial will attempt to connect a link with the specified prefix to the specified address.
 // Returns an error if connection handshake fails. Otherwise returns the connected httpClient.
-func dial(addr, prefix, home, token string) (*httpClient, error) {
-	u, err := url.Parse(addr)
+func dial(conf *Config) (*httpClient, error) {
+	u, err := url.Parse(conf.broker)
 	if err != nil {
 		return nil, err
 	}
@@ -185,23 +185,23 @@ func dial(addr, prefix, home, token string) (*httpClient, error) {
 		keyMaker: crypto.NewECDH(),
 		htClient: &http.Client{Timeout: time.Second * 60},
 		rawUrl:   u,
-		home:     home,
+		home:     conf.home,
 	}
 
 	// TODO: The keys should be managed outside of the httpClient and
 	// passed in as needed
-	c.cPriv, err = crypto.LoadKey("")
+	c.cPriv, err = crypto.LoadKey(conf.keyPath)
 	if err != nil {
 		c.cPriv, err = c.keyMaker.GenerateKey(rand.Reader)
 		if err != nil {
 			return nil, fmt.Errorf("Unable to generate key: %v", err)
 		}
-		_ = crypto.SaveKey(c.cPriv, "")
+		_ = crypto.SaveKey(c.cPriv, conf.keyPath)
 	}
-	c.dsId = c.cPriv.DsId(prefix)
+	c.dsId = c.cPriv.DsId(conf.name)
 
-	if len(token) >= 16 { // TODO: Why 16??
-		c.token = token[:16]
+	if len(conf.token) >= 16 { // TODO: Why 16??
+		c.token = conf.token[:16]
 		c.tHash = c.keyMaker.HashToken(c.dsId, c.token)
 	}
 
