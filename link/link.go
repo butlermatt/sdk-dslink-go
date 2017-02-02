@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	lg "log"
 	"os"
+	"github.com/butlermatt/dslink"
 )
 
 const dslinkJson = "dslink.json"
@@ -26,6 +27,12 @@ var log *lg.Logger
 func Logger(l *lg.Logger) func(c *Config) {
 	return func(c *Config) {
 		log = l
+	}
+}
+
+func Provider(p dslink.Provider) func(c *Config) {
+	return func(c *Config) {
+		c.provider = p
 	}
 }
 
@@ -51,6 +58,7 @@ type Config struct {
 	keyPath	    string
 	logFile     string
 	log         bool
+	provider    dslink.Provider
 }
 
 func NewLink(prefix string, options ...func(*Config)) Link {
@@ -85,6 +93,9 @@ func NewLink(prefix string, options ...func(*Config)) Link {
 type link struct {
 	conf Config
 	cl   *httpClient
+	pr   dslink.Provider
+	msgs chan *message
+	salt string
 }
 
 type dsJson struct {
@@ -95,6 +106,9 @@ func (l *link) Init() {
 	if l.conf.name[len(l.conf.name)-1] != '-' {
 		l.conf.name += "-"
 	}
+
+	l.pr = l.conf.provider
+	l.conf.provider = nil
 	// TODO:
 	// Load dslink.json
 	l.loadDsJson()
@@ -104,14 +118,46 @@ func (l *link) Init() {
 func (l *link) Start() {
 	// TODO
 	var err error
-	l.cl, err = dial(&l.conf)
+	l.msgs = make(chan *message)
+	l.cl, err = dial(&l.conf, l.msgs)
 	if err != nil {
 		panic(err)
+	}
+
+	for {
+		select {
+		case m := <-l.msgs:
+			go l.handleMessage(m)
+		}
 	}
 }
 
 func (l *link) Stop() {
 	l.cl.Close()
+}
+
+func (l *link) handleMessage(m *message) {
+	var r *message
+	log.Printf("Received message: %+v", *m)
+
+	if len(m.Reqs) == 0 && len(m.Resp) == 0 && m.Salt == "" {
+		// Ignore message.
+		return
+	}
+	log.Println("It needs to be handled")
+
+	if m.Salt != "" {
+		r = &message{Ack: m.Msg}
+		l.salt = m.Salt
+	}
+
+	for _, req := range m.Reqs {
+		log.Printf("Received request: %+v", req)
+	}
+
+	if r != nil {
+		l.cl.out<- r
+	}
 }
 
 func (l *link) loadDsJson() {

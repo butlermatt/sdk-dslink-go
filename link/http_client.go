@@ -17,6 +17,7 @@ import (
 )
 
 const pingTime = 45 * time.Second
+const maxMsgId = 0x7FFFFFFF
 
 type dsResp struct {
 	Id        string `json:"id"`
@@ -34,7 +35,7 @@ type dsResp struct {
 
 type httpClient struct {
 	dsId     string
-	msgId    uint32
+	msgId    int32
 	reqId    uint32
 	keyMaker crypto.ECDH
 	htClient *http.Client
@@ -45,8 +46,9 @@ type httpClient struct {
 	wsClient *websocket.Conn
 	cPriv    crypto.PrivateKey
 	in       chan []byte
-	out      chan string
+	out      chan *message
 	ping     *time.Timer
+	msgs     chan *message
 }
 
 // Close will force the Websocket on the httpClient to be closed.
@@ -147,26 +149,37 @@ func (c *httpClient) handleConnections() {
 		select {
 		case s := <-c.in:
 			//TODO: Handle a received message
-			log.Printf("Received message: %s\n", s)
+			log.Printf("Recv: %s\n", s)
 			msg := &message{Msg: -1, Ack: -1}
 			err := json.Unmarshal(s, msg)
 			if err != nil {
 				log.Printf("Error unmarshalling %s\nError: %v\n", s, err)
 			}
-			go func(m *message) {
-				log.Printf("Received message: %+v\n", *m)
-			}(msg)
-		case o := <-c.out:
-			log.Printf("Sending message: %s\n", o)
-			c.wsClient.WriteMessage(websocket.TextMessage, []byte(o))
+			c.msgs <- msg
+		case m := <-c.out:
+			if c.msgId == maxMsgId {
+				c.msgId = 0
+			}
+			c.msgId++
+			m.Msg = c.msgId
+			s, err := json.Marshal(*m)
+			if err != nil {
+				log.Printf("Error marshalling %+v\nError: %+v\n", *m, err)
+				continue
+			}
+			log.Printf("Sent: %s\n", s)
+			c.wsClient.WriteMessage(websocket.TextMessage, s)
 			if !c.ping.Stop() {
 				<-c.ping.C
 			}
 			c.ping.Reset(pingTime)
 		case <-c.ping.C:
+			if c.msgId == maxMsgId {
+				c.msgId = 0
+			}
 			c.msgId++
 			m := fmt.Sprintf("{\"msg\": %d}", c.msgId)
-			log.Printf("Sending message: %s\n", m)
+			log.Printf("Sent: %s\n", m)
 			c.wsClient.WriteMessage(websocket.TextMessage, []byte(m))
 			c.ping.Reset(pingTime)
 		}
@@ -175,7 +188,7 @@ func (c *httpClient) handleConnections() {
 
 // Dial will attempt to connect a link with the specified prefix to the specified address.
 // Returns an error if connection handshake fails. Otherwise returns the connected httpClient.
-func dial(conf *Config) (*httpClient, error) {
+func dial(conf *Config, msgs chan *message) (*httpClient, error) {
 	u, err := url.Parse(conf.broker)
 	if err != nil {
 		return nil, err
@@ -186,6 +199,7 @@ func dial(conf *Config) (*httpClient, error) {
 		htClient: &http.Client{Timeout: time.Second * 60},
 		rawUrl:   u,
 		home:     conf.home,
+		msgs:     msgs,
 	}
 
 	// TODO: The keys should be managed outside of the httpClient and
@@ -218,7 +232,7 @@ func dial(conf *Config) (*httpClient, error) {
 	c.wsClient = conn
 	c.ping = time.NewTimer(pingTime)
 	c.in = make(chan []byte)
-	c.out = make(chan string)
+	c.out = make(chan *message)
 
 	go c.handleConnections()
 
