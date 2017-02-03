@@ -4,6 +4,7 @@ import (
 	"github.com/butlermatt/dslink"
 	"fmt"
 	"strings"
+	"errors"
 )
 
 // ValueType represents the type of value stored by the Node
@@ -32,7 +33,8 @@ type SimpleNode struct {
 	provider dslink.Provider
 	attr map[string]interface{}
 	conf map[string]interface{}
-	Parent SimpleNode
+	chld map[string]*SimpleNode
+	Parent *SimpleNode
 }
 
 func (n *SimpleNode) GetAttribute(name string) (interface{}, bool) {
@@ -51,6 +53,11 @@ func (n *SimpleNode) GetChild(name string) dslink.Node {
 
 func (n *SimpleNode) AddChild(node dslink.Node) error {
 	sn, ok := node.(*SimpleNode)
+	if !ok {
+		return errors.New("Can't add unknown node type")
+	}
+	sn.Parent = n
+
 	return nil
 }
 

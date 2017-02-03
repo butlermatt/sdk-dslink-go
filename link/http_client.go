@@ -14,10 +14,27 @@ import (
 import (
 	"github.com/butlermatt/dslink/crypto"
 	"github.com/gorilla/websocket"
+	"gopkg.in/vmihailenco/msgpack.v2"
+	"bytes"
+	"github.com/butlermatt/dslink"
 )
 
-const pingTime = 45 * time.Second
+const pingTime = 30 * time.Second
 const maxMsgId = 0x7FFFFFFF
+
+type msgFormat int;
+const (
+	fmtJson msgFormat = iota
+	fmtMsgP
+)
+
+type encode interface {
+	Encode(interface{}) error
+}
+
+type decode interface {
+	Decode(interface{}) error
+}
 
 type dsResp struct {
 	Id        string `json:"id"`
@@ -34,6 +51,10 @@ type dsResp struct {
 }
 
 type httpClient struct {
+	enc      encode
+	dec      decode
+	encBuf	 bytes.Buffer
+	decBuf	 bytes.Buffer
 	dsId     string
 	msgId    int32
 	reqId    uint32
@@ -46,9 +67,10 @@ type httpClient struct {
 	wsClient *websocket.Conn
 	cPriv    crypto.PrivateKey
 	in       chan []byte
-	out      chan *message
+	out      chan *dslink.Message
 	ping     *time.Timer
-	msgs     chan *message
+	msgs     chan *dslink.Message
+	format   msgFormat
 }
 
 // Close will force the Websocket on the httpClient to be closed.
@@ -72,7 +94,7 @@ func (c *httpClient) getWsConfig() (*dsResp, error) {
 
 	// TODO: Put this in a struct!
 	values := fmt.Sprintf("{\"publicKey\": \"%s\", \"isRequester\": false, \"isResponder\": true,"+
-		"\"linkData\": {}, \"version\": \"1.1.2\", \"formats\": [\"json\"], \"enableWebSocketCompression\": true}",
+		"\"linkData\": {}, \"version\": \"1.1.2\", \"formats\": [\"msgpack\",\"json\"], \"enableWebSocketCompression\": true}",
 		c.cPriv.PublicKey.Base64())
 	res, err := c.htClient.Post(u.String(), "application/json", strings.NewReader(values))
 	if err != nil {
@@ -89,10 +111,20 @@ func (c *httpClient) getWsConfig() (*dsResp, error) {
 	if err = json.Unmarshal(b, dr); err != nil {
 		return nil, fmt.Errorf("Unable to decode response: %s\nError: %s", b, err)
 	}
+	log.Printf("Received configuration: %+v\n", *dr)
 	return dr, nil
 }
 
 func (c *httpClient) connectWs(config *dsResp) (*websocket.Conn, error) {
+	switch config.Format {
+	case "json":
+		c.format = fmtJson
+	case "msgpack":
+		c.format = fmtMsgP
+	default:
+		return nil, fmt.Errorf("Unknown message format: %s", config.Format)
+	}
+
 	sPub, err := c.keyMaker.UnmarshalPublic(config.TempKey)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to parse server key: %s\nError: %s", config.TempKey, err)
@@ -127,19 +159,46 @@ func (c *httpClient) connectWs(config *dsResp) (*websocket.Conn, error) {
 	return conn, nil
 }
 
+func (c *httpClient) marshal(v interface{}) (int, []byte, error) {
+	var f int
+	var d []byte
+	var err error
+	switch c.format {
+	case fmtJson:
+		f = websocket.TextMessage
+		d, err = json.Marshal(v)
+	case fmtMsgP:
+		f = websocket.BinaryMessage
+		d, err = msgpack.Marshal(v)
+	}
+
+	return f, d, err
+}
+
+func (c *httpClient) unmarshal(data []byte, v interface{}) error {
+	var err error
+	switch c.format {
+	case fmtJson:
+		err = json.Unmarshal(data, v)
+	case fmtMsgP:
+		err = msgpack.Unmarshal(data, v)
+	}
+	return err
+}
+
 func (c *httpClient) handleConnections() {
 	go func() {
 		for {
-			mt, p, err := c.wsClient.ReadMessage()
+			_, p, err := c.wsClient.ReadMessage()
 			if err != nil {
 				//TODO: Better logging/handling here
 				log.Printf("Read error! %v\n", err)
 				return
 			}
-			if mt != websocket.TextMessage {
-				log.Println("Read error. Data is binary!?")
-				return
-			}
+			//if mt != websocket.TextMessage {
+			//	log.Println("Read error. Data is binary!?")
+			//	return
+			//}
 			c.in <- p
 		}
 	}()
@@ -150,8 +209,8 @@ func (c *httpClient) handleConnections() {
 		case s := <-c.in:
 			//TODO: Handle a received message
 			log.Printf("Recv: %s\n", s)
-			msg := &message{Msg: -1, Ack: -1}
-			err := json.Unmarshal(s, msg)
+			msg := &dslink.Message{Msg: -1, Ack: -1}
+			err := c.unmarshal(s, msg)
 			if err != nil {
 				log.Printf("Error unmarshalling %s\nError: %v\n", s, err)
 			}
@@ -162,25 +221,22 @@ func (c *httpClient) handleConnections() {
 			}
 			c.msgId++
 			m.Msg = c.msgId
-			s, err := json.Marshal(*m)
+			t, s, err := c.marshal(*m)
 			if err != nil {
 				log.Printf("Error marshalling %+v\nError: %+v\n", *m, err)
 				continue
 			}
 			log.Printf("Sent: %s\n", s)
-			c.wsClient.WriteMessage(websocket.TextMessage, s)
+			c.wsClient.WriteMessage(t, s)
 			if !c.ping.Stop() {
 				<-c.ping.C
 			}
 			c.ping.Reset(pingTime)
 		case <-c.ping.C:
-			if c.msgId == maxMsgId {
-				c.msgId = 0
-			}
-			c.msgId++
-			m := fmt.Sprintf("{\"msg\": %d}", c.msgId)
-			log.Printf("Sent: %s\n", m)
-			c.wsClient.WriteMessage(websocket.TextMessage, []byte(m))
+			go func() {
+				m := &dslink.Message{Msg: c.msgId}
+				c.out <- m
+			}()
 			c.ping.Reset(pingTime)
 		}
 	}
@@ -188,7 +244,7 @@ func (c *httpClient) handleConnections() {
 
 // Dial will attempt to connect a link with the specified prefix to the specified address.
 // Returns an error if connection handshake fails. Otherwise returns the connected httpClient.
-func dial(conf *Config, msgs chan *message) (*httpClient, error) {
+func dial(conf *Config, msgs chan *dslink.Message) (*httpClient, error) {
 	u, err := url.Parse(conf.broker)
 	if err != nil {
 		return nil, err
@@ -232,7 +288,7 @@ func dial(conf *Config, msgs chan *message) (*httpClient, error) {
 	c.wsClient = conn
 	c.ping = time.NewTimer(pingTime)
 	c.in = make(chan []byte)
-	c.out = make(chan *message)
+	c.out = make(chan *dslink.Message)
 
 	go c.handleConnections()
 

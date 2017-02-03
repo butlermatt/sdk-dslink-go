@@ -3,9 +3,10 @@ package link
 import (
 	"encoding/json"
 	"io/ioutil"
-	lg "log"
 	"os"
+	lg "log"
 	"github.com/butlermatt/dslink"
+	"github.com/butlermatt/dslink/provider"
 )
 
 const dslinkJson = "dslink.json"
@@ -26,7 +27,7 @@ var log *lg.Logger
 
 func Logger(l *lg.Logger) func(c *Config) {
 	return func(c *Config) {
-		log = l
+		dslink.Log = l
 	}
 }
 
@@ -76,12 +77,13 @@ func NewLink(prefix string, options ...func(*Config)) Link {
 	parseFlags(&l.conf)
 
 	if l.conf.log {
-		if log == nil {
-			log = lg.New(os.Stdout, "", lg.Lshortfile)
+		if dslink.Log == nil {
+			dslink.Log = lg.New(os.Stdout, "", lg.Lshortfile)
 		}
-	} else if log == nil {
-		log = lg.New(ioutil.Discard, "", lg.Lshortfile)
+	} else if dslink.Log == nil {
+		dslink.Log = lg.New(ioutil.Discard, "", lg.Lshortfile)
 	}
+	log = dslink.Log
 
 	if l.conf.autoInit {
 		l.Init()
@@ -94,7 +96,7 @@ type link struct {
 	conf Config
 	cl   *httpClient
 	pr   dslink.Provider
-	msgs chan *message
+	msgs chan *dslink.Message
 	salt string
 }
 
@@ -107,8 +109,12 @@ func (l *link) Init() {
 		l.conf.name += "-"
 	}
 
-	l.pr = l.conf.provider
-	l.conf.provider = nil
+	if l.conf.provider != nil {
+		l.pr = l.conf.provider
+		l.conf.provider = nil
+	} else {
+		l.pr = provider.New()
+	}
 	// TODO:
 	// Load dslink.json
 	l.loadDsJson()
@@ -118,7 +124,7 @@ func (l *link) Init() {
 func (l *link) Start() {
 	// TODO
 	var err error
-	l.msgs = make(chan *message)
+	l.msgs = make(chan *dslink.Message)
 	l.cl, err = dial(&l.conf, l.msgs)
 	if err != nil {
 		panic(err)
@@ -136,8 +142,8 @@ func (l *link) Stop() {
 	l.cl.Close()
 }
 
-func (l *link) handleMessage(m *message) {
-	var r *message
+func (l *link) handleMessage(m *dslink.Message) {
+	var r *dslink.Message
 	log.Printf("Received message: %+v", *m)
 
 	if len(m.Reqs) == 0 && len(m.Resp) == 0 && m.Salt == "" {
@@ -147,12 +153,12 @@ func (l *link) handleMessage(m *message) {
 	log.Println("It needs to be handled")
 
 	if m.Salt != "" {
-		r = &message{Ack: m.Msg}
+		r = &dslink.Message{Ack: m.Msg}
 		l.salt = m.Salt
 	}
 
 	for _, req := range m.Reqs {
-		log.Printf("Received request: %+v", req)
+		l.pr.HandleRequest(req)
 	}
 
 	if r != nil {

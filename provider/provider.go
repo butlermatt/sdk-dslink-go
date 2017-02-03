@@ -25,3 +25,7 @@ func New() *SimpleProvider {
 	sp.cache["/"] = r
 	return sp
 }
+
+func (s *SimpleProvider) HandleRequest(req dslink.Request) {
+	dslink.Log.Printf("Received Request: %+v", req)
+}
