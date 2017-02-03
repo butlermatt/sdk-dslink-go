@@ -78,10 +78,10 @@ func NewLink(prefix string, options ...func(*Config)) Link {
 
 	if l.conf.log {
 		if dslink.Log == nil {
-			dslink.Log = lg.New(os.Stdout, "", lg.Lshortfile)
+			dslink.Log = lg.New(os.Stdout, "[DSA] ",0 /*lg.Lshortfile*/)
 		}
 	} else if dslink.Log == nil {
-		dslink.Log = lg.New(ioutil.Discard, "", lg.Lshortfile)
+		dslink.Log = lg.New(ioutil.Discard, "[DSA] ", lg.Lshortfile)
 	}
 	log = dslink.Log
 
@@ -144,13 +144,11 @@ func (l *link) Stop() {
 
 func (l *link) handleMessage(m *dslink.Message) {
 	var r *dslink.Message
-	log.Printf("Received message: %+v", *m)
 
 	if len(m.Reqs) == 0 && len(m.Resp) == 0 && m.Salt == "" {
 		// Ignore message.
 		return
 	}
-	log.Println("It needs to be handled")
 
 	if m.Salt != "" {
 		r = &dslink.Message{Ack: m.Msg}

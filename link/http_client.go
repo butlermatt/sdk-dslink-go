@@ -195,10 +195,6 @@ func (c *httpClient) handleConnections() {
 				log.Printf("Read error! %v\n", err)
 				return
 			}
-			//if mt != websocket.TextMessage {
-			//	log.Println("Read error. Data is binary!?")
-			//	return
-			//}
 			c.in <- p
 		}
 	}()
@@ -207,13 +203,12 @@ func (c *httpClient) handleConnections() {
 	for {
 		select {
 		case s := <-c.in:
-			//TODO: Handle a received message
-			log.Printf("Recv: %s\n", s)
 			msg := &dslink.Message{Msg: -1, Ack: -1}
 			err := c.unmarshal(s, msg)
 			if err != nil {
 				log.Printf("Error unmarshalling %s\nError: %v\n", s, err)
 			}
+			log.Printf("Recv: %+v", *msg)
 			c.msgs <- msg
 		case m := <-c.out:
 			if c.msgId == maxMsgId {
@@ -226,7 +221,7 @@ func (c *httpClient) handleConnections() {
 				log.Printf("Error marshalling %+v\nError: %+v\n", *m, err)
 				continue
 			}
-			log.Printf("Sent: %s\n", s)
+			log.Printf("Sent: %+v\n", *m)
 			c.wsClient.WriteMessage(t, s)
 			if !c.ping.Stop() {
 				<-c.ping.C
