@@ -44,11 +44,22 @@ func (m *Message) String() string {
 
 type Request struct {
 	Rid    int32      `json:"rid" msgpack:"rid"`
-	Method string     `json:"method" msgpack:"method"`
+	Method MethodType `json:"method" msgpack:"method"`
 	Path   string     `json:"path,omitempty" msgpack:"path,omitempty"`
 	Paths  []*SubPath `json:"paths,omitempty" msgpack:"paths,omitempty"`
 	Sids   []int32    `json:"sids,omitempty" msgpack:"sids,omitempty"`
 }
+
+type MethodType string;
+const (
+	MethodList    MethodType = "list"
+	MethodSub     MethodType = "subscribe"
+	MethodUnsub   MethodType = "unsubscribe"
+	MethodClose   MethodType = "close"
+	MethodSet     MethodType = "set"
+	MethodRemove  MethodType = "remove"
+	MethodInvoke  MethodType = "invoke"
+)
 
 func (r *Request) String() string {
 	s := fmt.Sprintf(`{"rid": %d, "method": "%s"`, r.Rid, r.Method)
@@ -80,9 +91,16 @@ func (sp *SubPath) String() string {
 	return fmt.Sprintf(`{"path": "%s", "sid": %d, "qos": %d}`, sp.Path, sp.Sid, sp.Qos)
 }
 
+type StreamState string;
+const (
+	StreamInit   StreamState = "initialize"
+	StreamOpen   StreamState = "open"
+	StreamClosed StreamState = "closed"
+)
+
 type Response struct {
 	Rid     int32               `json:"rid" msgpack:"rid"`
-	Stream  string              `json:"stream" msgpack:"stream"`
+	Stream  StreamState         `json:"stream" msgpack:"stream"`
 	Updates []interface{}       `json:"updates" msgpack:"updates"`
 	Columns []map[string]string `json:"columns,omitempty" msgpack:"columns,omitempty"`
 	Error   *MsgErr             `json:"error,omitempty" msgpack:"error,omitempty"`
@@ -105,7 +123,7 @@ func (r *Response) AddUpdate(name interface{}, value interface{}) {
 	switch t := value.(type) {
 	case *ValueUpdate:
 		m := make(map[string]interface{})
-		m[`ts`] = t.ts.Format(time.RFC3339)
+		m[`ts`] = t.ts.Format(time.RFC3339Nano)
 		m[`sid`] = name
 		m[`value`] = t.Value()
 		r.Updates = append(r.Updates, m)

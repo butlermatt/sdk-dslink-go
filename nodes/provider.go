@@ -55,13 +55,13 @@ func (s *SimpleProvider) HandleRequest(req *dslink.Request) *dslink.Response {
 	dslink.Log.Printf("Received Request: %+v", req)
 
 	switch req.Method {
-	case "list":
+	case dslink.MethodList:
 		return s.handleList(req)
-	case "close":
+	case dslink.MethodClose:
 		s.handleClose(req)
-	case "subscribe":
+	case dslink.MethodSub:
 		return s.handleSub(req)
-	case "unsubscribe":
+	case dslink.MethodUnsub:
 		return s.handleUnsub(req)
 	default:
 		dslink.Log.Printf("Unhandled method: %s", req.Method)
@@ -86,7 +86,7 @@ func (s *SimpleProvider) handleClose(req *dslink.Request) {
 
 func (s *SimpleProvider) handleSub(req *dslink.Request) *dslink.Response {
 	r := dslink.NewResp(req.Rid)
-	r.Stream = "closed"
+	r.Stream = dslink.StreamClosed
 
 	for _, p := range req.Paths {
 		n := s.cache[p.Path]
@@ -112,7 +112,7 @@ func (s *SimpleProvider) handleSub(req *dslink.Request) *dslink.Response {
 
 func (s *SimpleProvider) handleUnsub(req *dslink.Request) *dslink.Response {
 	r := dslink.NewResp(req.Rid)
-	r.Stream = "closed"
+	r.Stream = dslink.StreamClosed
 
 	for _, i := range req.Sids {
 		nd := s.valSubs[i]

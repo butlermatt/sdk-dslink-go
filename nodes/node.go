@@ -105,7 +105,7 @@ func (n *SimpleNode) notifySubs(update *dslink.ValueUpdate) {
 func (n *SimpleNode) List(request *dslink.Request) *dslink.Response {
 	n.listSubs = append(n.listSubs, request.Rid)
 	r := dslink.NewResp(request.Rid)
-	r.Stream = "open"
+	r.Stream = dslink.StreamOpen
 
 	is, _ := n.GetConfig(`$is`)
 	r.AddUpdate(`$is`, is)
