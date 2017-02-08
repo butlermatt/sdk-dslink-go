@@ -11,6 +11,8 @@ type Provider interface {
 	GetNode(path string) (Node, bool)
 	GetRoot() Node
 	HandleRequest(req *Request) *Response
+	SendResponse(resp *Response)
+	AddNode(path string, node Node)
 	//GetOrCreateNode(path string) Node;
 }
 

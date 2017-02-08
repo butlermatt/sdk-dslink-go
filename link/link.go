@@ -44,6 +44,7 @@ type Link interface {
 	// Start will start the link to establish connection to the broker.
 	Start()
 	Stop()
+	GetProvider() dslink.Provider
 }
 
 // TODO: Provide some kind of config option for logger and logger level
@@ -151,6 +152,10 @@ func (l *link) Stop() {
 	l.cl.Close()
 }
 
+func (l *link) GetProvider() dslink.Provider {
+	return l.pr
+}
+
 func (l *link) handleMessage(m *dslink.Message) {
 	var r *dslink.Message
 
@@ -165,10 +170,11 @@ func (l *link) handleMessage(m *dslink.Message) {
 	}
 
 	for _, req := range m.Reqs {
-		r.Resp = append(r.Resp, l.pr.HandleRequest(req))
+		res := l.pr.HandleRequest(req)
+		if res != nil {
+			r.Resp = append(r.Resp, res)
+		}
 	}
-
-	dslink.Log.Printf("Message is: %+v", r)
 
 	if r != nil {
 		l.cl.out<- r

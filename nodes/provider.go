@@ -5,10 +5,10 @@ import (
 )
 
 type SimpleProvider struct {
-	cache    map[string]*SimpleNode
-	root     *SimpleNode
+	cache    map[string]dslink.Node
+	root     dslink.Node
 	resp     chan<- *dslink.Response
-	listResp map[int32]*SimpleNode
+	listResp map[int32]dslink.Node
 }
 
 func (s *SimpleProvider) GetNode(path string) (dslink.Node, bool) {
@@ -21,12 +21,20 @@ func (s *SimpleProvider) GetRoot() dslink.Node {
 }
 
 func NewProvider(resp chan<- *dslink.Response) *SimpleProvider {
-	sp := &SimpleProvider{cache: make(map[string]*SimpleNode), listResp: make(map[int32]*SimpleNode)}
+	sp := &SimpleProvider{cache: make(map[string]dslink.Node), listResp: make(map[int32]dslink.Node)}
 	r := NewNode("", sp)
 	sp.root = r
 	sp.cache["/"] = r
 	sp.resp = resp
 	return sp
+}
+
+func (s *SimpleProvider) AddNode(path string, node dslink.Node) {
+	s.cache[path] = node
+}
+
+func (s *SimpleProvider) SendResponse(resp *dslink.Response) {
+	s.resp<- resp
 }
 
 func (s *SimpleProvider) HandleRequest(req *dslink.Request) *dslink.Response {
@@ -50,6 +58,8 @@ func (s *SimpleProvider) handleList(req *dslink.Request) *dslink.Response {
 
 func (s *SimpleProvider) handleClose(req *dslink.Request) {
 	nd := s.listResp[req.Rid]
-	nd.Close(req)
+	if nd != nil {
+		nd.Close(req)
+	}
 	delete(s.listResp, req.Rid)
 }

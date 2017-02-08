@@ -30,11 +30,11 @@ func GenerateEnumValue(options ...string) ValueType {
 }
 
 type SimpleNode struct {
-	p	    *SimpleProvider
+	p	    dslink.Provider
 	attr        map[string]interface{}
 	conf        map[string]interface{}
-	chld        map[string]*SimpleNode
-	Parent      *SimpleNode
+	chld        map[string]dslink.Node
+	Parent      dslink.Node
 	name        string
 	displayName string
 	path        string
@@ -62,9 +62,10 @@ func (n *SimpleNode) AddChild(node dslink.Node) error {
 	}
 	sn.Parent = n
 	sn.path = n.path + "/" + sn.name
-	n.p.cache[sn.path] = sn
+	n.p.AddNode(sn.path, sn)
+	n.chld[sn.name] = sn
 
-	n.notifyList(sn.name, sn.toMap())
+	n.notifyList(sn.name, sn.ToMap())
 
 	return nil
 }
@@ -78,10 +79,11 @@ func (n *SimpleNode) RemoveNode(node dslink.Node) error {
 }
 
 func (n *SimpleNode) notifyList(name string, value interface{}) {
+	dslink.Log.Printf("There are %d nodes to notify\n", len(n.listSubs))
 	for _, i := range n.listSubs {
 		r := &dslink.Response{Rid: i}
 		r.AddUpdate(name, value)
-		n.p.resp<- r
+		n.p.SendResponse(r)
 	}
 }
 
@@ -93,6 +95,11 @@ func (n *SimpleNode) List(request *dslink.Request) *dslink.Response {
 	is, _ := n.GetConfig(`$is`)
 	r.AddUpdate(`$is`, is)
 
+
+	for name, nd := range n.chld {
+		r.AddUpdate(name, nd.ToMap())
+	}
+
 	return r
 }
 
@@ -101,7 +108,7 @@ func (n *SimpleNode) Close(request *dslink.Request) {
 	for j, id := range n.listSubs {
 		if id == request.Rid {
 			i = j
-			break;
+			break
 		}
 	}
 
@@ -112,7 +119,7 @@ func (n *SimpleNode) Close(request *dslink.Request) {
 	}
 }
 
-func (n *SimpleNode) toMap() map[string]interface{} {
+func (n *SimpleNode) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 	m[`$is`] = n.conf[`$is`]
 	name, ok := n.conf[`$name`]
@@ -128,13 +135,13 @@ func (n *SimpleNode) toMap() map[string]interface{} {
 	return m
 }
 
-func NewNode(name string, provider *SimpleProvider) *SimpleNode {
+func NewNode(name string, provider dslink.Provider) *SimpleNode {
 	sn := &SimpleNode{
 		name: name,
 		p:    provider,
 		attr: make(map[string]interface{}),
 		conf: make(map[string]interface{}),
-		chld: make(map[string]*SimpleNode),
+		chld: make(map[string]dslink.Node),
 	}
 
 	sn.conf[`$is`] = `node`

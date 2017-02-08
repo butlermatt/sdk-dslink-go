@@ -8,6 +8,9 @@ type Node interface {
 	RemoveChild(string) error
 	RemoveNode(Node) error
 	GetChild(string) Node
+	List(*Request) *Response
+	Close(*Request)
+	ToMap() map[string]interface{}
 }
 
 type LocalNode interface {
