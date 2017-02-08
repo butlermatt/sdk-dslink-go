@@ -2,32 +2,8 @@ package nodes
 
 import (
 	"errors"
-	"fmt"
 	"github.com/butlermatt/dslink"
-	"strings"
 )
-
-// ValueType represents the type of value stored by the Node
-type ValueType string
-
-const (
-	// ValueBool indicates this value type is a boolean
-	ValueBool ValueType = "bool"
-	// ValueNum indicates this value type is a number (integer or double)
-	ValueNum ValueType = "num"
-	// ValueString indicates this value type is a String
-	ValueString ValueType = "string"
-	// ValueDynamic indicates this value type is of an undetermined type
-	ValueDynamic ValueType = "dynamic"
-	// ValueDynamic indicates this value type is a Map
-	ValueMap ValueType = "map"
-	// ValueDynamic indicates this value type is an Array
-	ValueArray ValueType = "array"
-)
-
-func GenerateEnumValue(options ...string) ValueType {
-	return ValueType(fmt.Sprintf("enum[%s]", strings.Join(options, ",")))
-}
 
 type SimpleNode struct {
 	p	    dslink.Provider
@@ -39,6 +15,9 @@ type SimpleNode struct {
 	displayName string
 	path        string
 	listSubs    []int32
+	subscribers []int32
+	value       interface{}
+	valType     dslink.ValueType
 }
 
 func (n *SimpleNode) GetAttribute(name string) (interface{}, bool) {
@@ -110,6 +89,19 @@ func (n *SimpleNode) notifyList(name string, value interface{}) {
 	}
 }
 
+func (n *SimpleNode) notifySubs(update *dslink.ValueUpdate) {
+	dslink.Log.Printf("There are %d nodes to notify\n", len(n.subscribers))
+	if len(n.subscribers) <= 0 {
+		return
+	}
+
+	r := dslink.NewResp(0)
+	for _, i := range n.subscribers {
+		r.AddUpdate(i, update)
+	}
+	n.p.SendResponse(r)
+}
+
 func (n *SimpleNode) List(request *dslink.Request) *dslink.Response {
 	n.listSubs = append(n.listSubs, request.Rid)
 	r := dslink.NewResp(request.Rid)
@@ -138,7 +130,27 @@ func (n *SimpleNode) Close(request *dslink.Request) {
 	if i != -1 {
 		n.listSubs[i] = n.listSubs[len(n.listSubs) - 1]
 		n.listSubs = n.listSubs[:len(n.listSubs) - 1]
-		dslink.Log.Printf("Closed link for Rid: %d", request.Rid)
+		dslink.Log.Printf("Closed link for Rid: %d\n", request.Rid)
+	}
+}
+
+func (n *SimpleNode) Subscribe(sid int32) {
+	n.subscribers = append(n.subscribers, sid)
+}
+
+func (n *SimpleNode) Unsubscribe(sid int32) {
+	i := -1
+	for j, id := range n.subscribers {
+		if id == sid {
+			i = j
+			break
+		}
+	}
+
+	if i != -1 {
+		n.subscribers[i] = n.subscribers[len(n.subscribers) - 1]
+		n.subscribers = n.subscribers[:len(n.subscribers) - 1]
+		dslink.Log.Printf("Closed stream for Sid: %d\n", sid)
 	}
 }
 
@@ -153,9 +165,33 @@ func (n *SimpleNode) ToMap() map[string]interface{} {
 	if ok && perm != nil && perm != "read" {
 		m[`$permission`] = perm
 	}
+	if n.valType != "" {
+		m[`$type`] = n.valType
+	}
+
 	// TODO: Check for: invokable, type and interface
 
 	return m
+}
+
+func (n *SimpleNode) GetType() dslink.ValueType {
+	return n.valType
+}
+
+func (n *SimpleNode) SetType(t dslink.ValueType) {
+	n.conf[`$type`] = t
+	n.valType = t
+}
+
+func (n *SimpleNode) UpdateValue(v interface{}) {
+	n.value = v
+	// TODO: Something about the subscription and stuff
+	val := dslink.NewValueUpdate(v)
+	n.notifySubs(val)
+}
+
+func (n *SimpleNode) Value() interface{} {
+	return n.value
 }
 
 func NewNode(name string, provider dslink.Provider) *SimpleNode {

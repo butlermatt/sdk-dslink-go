@@ -107,6 +107,7 @@ type dsJson struct {
 }
 
 func (l *link) Init() {
+	l.resp = make(chan *dslink.Response)
 	if l.conf.name[len(l.conf.name)-1] != '-' {
 		l.conf.name += "-"
 	}
@@ -127,7 +128,6 @@ func (l *link) Start() {
 	// TODO
 	var err error
 	l.msgs = make(chan *dslink.Message)
-	l.resp = make(chan *dslink.Response)
 	l.cl, err = dial(&l.conf, l.msgs)
 	if err != nil {
 		panic(err)
@@ -141,9 +141,8 @@ func (l *link) Start() {
 			m := &dslink.Message{}
 			if or != nil {
 				m.Resp = append(m.Resp, or)
-			}
 				l.cl.out <- m
-
+			}
 		}
 	}
 }

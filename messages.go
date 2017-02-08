@@ -3,6 +3,7 @@ package dslink
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 type Message struct {
@@ -46,7 +47,7 @@ type Request struct {
 	Method string     `json:"method" msgpack:"method"`
 	Path   string     `json:"path,omitempty" msgpack:"path,omitempty"`
 	Paths  []*SubPath `json:"paths,omitempty" msgpack:"paths,omitempty"`
-	Sids   []int      `json:"sids,omitempty" msgpack:"sids,omitempty"`
+	Sids   []int32    `json:"sids,omitempty" msgpack:"sids,omitempty"`
 }
 
 func (r *Request) String() string {
@@ -71,7 +72,7 @@ func (r *Request) String() string {
 
 type SubPath struct {
 	Path string `json:"path" msgpack:"path"`
-	Sid  int    `json:"sid" msgpack:"sid"`
+	Sid  int32  `json:"sid" msgpack:"sid"`
 	Qos  uint8  `json:"qos,omitempty" msgpack:"qos,omitempty"`
 }
 
@@ -82,7 +83,7 @@ func (sp *SubPath) String() string {
 type Response struct {
 	Rid     int32               `json:"rid" msgpack:"rid"`
 	Stream  string              `json:"stream" msgpack:"stream"`
-	Updates [][]interface{}     `json:"updates" msgpack:"updates"`
+	Updates []interface{}       `json:"updates" msgpack:"updates"`
 	Columns []map[string]string `json:"columns,omitempty" msgpack:"columns,omitempty"`
 	Error   *MsgErr             `json:"error,omitempty" msgpack:"error,omitempty"`
 }
@@ -100,10 +101,19 @@ func (r *Response) String() string {
 	return s
 }
 
-func (r *Response) AddUpdate(name string, value interface{}) {
-	var u []interface{}
-	u = append(u, name, value)
-	r.Updates = append(r.Updates, u)
+func (r *Response) AddUpdate(name interface{}, value interface{}) {
+	switch t := value.(type) {
+	case *ValueUpdate:
+		m := make(map[string]interface{})
+		m[`ts`] = t.ts.Format(time.RFC3339)
+		m[`sid`] = name
+		m[`value`] = t.Value()
+		r.Updates = append(r.Updates, m)
+	default:
+		var u []interface{}
+		u = append(u, name, value)
+		r.Updates = append(r.Updates, u)
+	}
 }
 
 func NewResp(rid int32) *Response {
@@ -120,5 +130,5 @@ type MsgErr struct {
 
 func (e *MsgErr) String() string {
 	return fmt.Sprintf(`{"type": %q, "msg": %q, "phase": %q, "path": %q, "detail": %q`,
-			e.Type, e.Msg, e.Phase, e.Path, e.Detail)
+		e.Type, e.Msg, e.Phase, e.Path, e.Detail)
 }
