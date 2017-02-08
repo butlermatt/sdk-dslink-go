@@ -9,7 +9,7 @@ import (
 type Node interface {
 	// TODO
 	GetAttribute(string) (interface{}, bool)
-	GetConfig(string) (interface{}, bool)
+	GetConfig(NodeConfig) (interface{}, bool)
 	AddChild(Node) error
 	RemoveChild(string) Node
 	Remove()

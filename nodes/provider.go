@@ -23,9 +23,9 @@ func (s *SimpleProvider) GetRoot() dslink.Node {
 
 func NewProvider(resp chan<- *dslink.Response) *SimpleProvider {
 	sp := &SimpleProvider{
-		cache: make(map[string]dslink.Node),
+		cache:    make(map[string]dslink.Node),
 		listResp: make(map[int32]dslink.Node),
-		valSubs: make(map[int32]dslink.Valued),
+		valSubs:  make(map[int32]dslink.Valued),
 	}
 	r := NewNode("", sp)
 	sp.root = r
@@ -48,7 +48,7 @@ func (s *SimpleProvider) RemoveNode(path string) dslink.Node {
 }
 
 func (s *SimpleProvider) SendResponse(resp *dslink.Response) {
-	s.resp<- resp
+	s.resp <- resp
 }
 
 func (s *SimpleProvider) HandleRequest(req *dslink.Request) *dslink.Response {

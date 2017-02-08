@@ -8,7 +8,7 @@ import (
 type SimpleNode struct {
 	p	    dslink.Provider
 	attr        map[string]interface{}
-	conf        map[string]interface{}
+	conf        map[dslink.NodeConfig]interface{}
 	chld        map[string]dslink.Node
 	Parent      dslink.Node
 	name        string
@@ -25,7 +25,7 @@ func (n *SimpleNode) GetAttribute(name string) (interface{}, bool) {
 	return a, ok
 }
 
-func (n *SimpleNode) GetConfig(name string) (interface{}, bool) {
+func (n *SimpleNode) GetConfig(name dslink.NodeConfig) (interface{}, bool) {
 	c, ok := n.conf[name]
 	return c, ok
 }
@@ -107,8 +107,8 @@ func (n *SimpleNode) List(request *dslink.Request) *dslink.Response {
 	r := dslink.NewResp(request.Rid)
 	r.Stream = dslink.StreamOpen
 
-	is, _ := n.GetConfig(`$is`)
-	r.AddUpdate(`$is`, is)
+	is, _ := n.GetConfig(dslink.ConfigIs)
+	r.AddUpdate(string(dslink.ConfigIs), is)
 
 
 	for name, nd := range n.chld {
@@ -156,20 +156,20 @@ func (n *SimpleNode) Unsubscribe(sid int32) {
 
 func (n *SimpleNode) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
-	m[`$is`] = n.conf[`$is`]
-	name, ok := n.conf[`$name`]
+	m[string(dslink.ConfigIs)] = n.conf[dslink.ConfigIs]
+	name, ok := n.conf[dslink.ConfigName]
 	if ok {
-		m[`$name`] = name
+		m[string(dslink.ConfigName)] = name
 	}
-	perm, ok := n.conf[`$permission`]
-	if ok && perm != nil && perm != "read" {
-		m[`$permission`] = perm
+	perm, ok := n.conf[dslink.ConfigPermission]
+	if ok && perm != nil && perm != dslink.PermRead {
+		m[string(dslink.ConfigPermission)] = perm
 	}
 	if n.valType != "" {
-		m[`$type`] = n.valType
+		m[string(dslink.ConfigType)] = n.valType
 	}
 
-	// TODO: Check for: invokable, type and interface
+	// TODO: Check for: invokable, and interface
 
 	return m
 }
@@ -179,7 +179,7 @@ func (n *SimpleNode) GetType() dslink.ValueType {
 }
 
 func (n *SimpleNode) SetType(t dslink.ValueType) {
-	n.conf[`$type`] = t
+	n.conf[dslink.ConfigType] = t
 	n.valType = t
 }
 
@@ -199,11 +199,11 @@ func NewNode(name string, provider dslink.Provider) *SimpleNode {
 		name: name,
 		p:    provider,
 		attr: make(map[string]interface{}),
-		conf: make(map[string]interface{}),
+		conf: make(map[dslink.NodeConfig]interface{}),
 		chld: make(map[string]dslink.Node),
 	}
 
-	sn.conf[`$is`] = `node`
+	sn.conf[dslink.ConfigIs] = "node"
 
 	return sn
 }
