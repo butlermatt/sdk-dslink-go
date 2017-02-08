@@ -10,7 +10,7 @@ type Provider interface {
 	// TODO
 	GetNode(path string) (Node, bool)
 	GetRoot() Node
-	HandleRequest(req Request)
+	HandleRequest(req *Request) *Response
 	//GetOrCreateNode(path string) Node;
 }
 

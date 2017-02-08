@@ -1,14 +1,14 @@
 package nodes
 
 import (
-	"github.com/butlermatt/dslink"
-	"fmt"
-	"strings"
 	"errors"
+	"fmt"
+	"github.com/butlermatt/dslink"
+	"strings"
 )
 
 // ValueType represents the type of value stored by the Node
-type ValueType string;
+type ValueType string
 
 const (
 	// ValueBool indicates this value type is a boolean
@@ -30,11 +30,15 @@ func GenerateEnumValue(options ...string) ValueType {
 }
 
 type SimpleNode struct {
-	provider dslink.Provider
-	attr map[string]interface{}
-	conf map[string]interface{}
-	chld map[string]*SimpleNode
-	Parent *SimpleNode
+	p	    *SimpleProvider
+	attr        map[string]interface{}
+	conf        map[string]interface{}
+	chld        map[string]*SimpleNode
+	Parent      *SimpleNode
+	name        string
+	displayName string
+	path        string
+	listSubs    []int32
 }
 
 func (n *SimpleNode) GetAttribute(name string) (interface{}, bool) {
@@ -57,6 +61,10 @@ func (n *SimpleNode) AddChild(node dslink.Node) error {
 		return errors.New("Can't add unknown node type")
 	}
 	sn.Parent = n
+	sn.path = n.path + "/" + sn.name
+	n.p.cache[sn.path] = sn
+
+	n.notifyList(sn.name, sn.toMap())
 
 	return nil
 }
@@ -69,6 +77,67 @@ func (n *SimpleNode) RemoveNode(node dslink.Node) error {
 	return nil
 }
 
-func New() *SimpleNode {
-	return &SimpleNode{}
+func (n *SimpleNode) notifyList(name string, value interface{}) {
+	for _, i := range n.listSubs {
+		r := &dslink.Response{Rid: i}
+		r.AddUpdate(name, value)
+		n.p.resp<- r
+	}
+}
+
+func (n *SimpleNode) List(request *dslink.Request) *dslink.Response {
+	n.listSubs = append(n.listSubs, request.Rid)
+	r := dslink.NewResp(request.Rid)
+	r.Stream = "open"
+
+	is, _ := n.GetConfig(`$is`)
+	r.AddUpdate(`$is`, is)
+
+	return r
+}
+
+func (n *SimpleNode) Close(request *dslink.Request) {
+	i := -1
+	for j, id := range n.listSubs {
+		if id == request.Rid {
+			i = j
+			break;
+		}
+	}
+
+	if i != -1 {
+		n.listSubs[i] = n.listSubs[len(n.listSubs) - 1]
+		n.listSubs = n.listSubs[:len(n.listSubs) - 1]
+		dslink.Log.Printf("Closed link for Rid: %d", request.Rid)
+	}
+}
+
+func (n *SimpleNode) toMap() map[string]interface{} {
+	m := make(map[string]interface{})
+	m[`$is`] = n.conf[`$is`]
+	name, ok := n.conf[`$name`]
+	if ok {
+		m[`$name`] = name
+	}
+	perm, ok := n.conf[`$permission`]
+	if ok && perm != nil && perm != "read" {
+		m[`$permission`] = perm
+	}
+	// TODO: Check for: invokable, type and interface
+
+	return m
+}
+
+func NewNode(name string, provider *SimpleProvider) *SimpleNode {
+	sn := &SimpleNode{
+		name: name,
+		p:    provider,
+		attr: make(map[string]interface{}),
+		conf: make(map[string]interface{}),
+		chld: make(map[string]*SimpleNode),
+	}
+
+	sn.conf[`$is`] = `node`
+
+	return sn
 }

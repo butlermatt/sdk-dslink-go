@@ -6,7 +6,7 @@ import (
 	"os"
 	lg "log"
 	"github.com/butlermatt/dslink"
-	"github.com/butlermatt/dslink/provider"
+	"github.com/butlermatt/dslink/nodes"
 )
 
 const dslinkJson = "dslink.json"
@@ -97,6 +97,7 @@ type link struct {
 	cl   *httpClient
 	pr   dslink.Provider
 	msgs chan *dslink.Message
+	resp chan *dslink.Response
 	salt string
 }
 
@@ -113,7 +114,7 @@ func (l *link) Init() {
 		l.pr = l.conf.provider
 		l.conf.provider = nil
 	} else {
-		l.pr = provider.New()
+		l.pr = nodes.NewProvider(l.resp)
 	}
 	// TODO:
 	// Load dslink.json
@@ -125,6 +126,7 @@ func (l *link) Start() {
 	// TODO
 	var err error
 	l.msgs = make(chan *dslink.Message)
+	l.resp = make(chan *dslink.Response)
 	l.cl, err = dial(&l.conf, l.msgs)
 	if err != nil {
 		panic(err)
@@ -132,8 +134,15 @@ func (l *link) Start() {
 
 	for {
 		select {
-		case m := <-l.msgs:
-			go l.handleMessage(m)
+		case im := <-l.msgs:
+			go l.handleMessage(im)
+		case or := <-l.resp:
+			m := &dslink.Message{}
+			if or != nil {
+				m.Resp = append(m.Resp, or)
+			}
+				l.cl.out <- m
+
 		}
 	}
 }
@@ -150,14 +159,16 @@ func (l *link) handleMessage(m *dslink.Message) {
 		return
 	}
 
+	r = &dslink.Message{Ack: m.Msg}
 	if m.Salt != "" {
-		r = &dslink.Message{Ack: m.Msg}
 		l.salt = m.Salt
 	}
 
 	for _, req := range m.Reqs {
-		l.pr.HandleRequest(req)
+		r.Resp = append(r.Resp, l.pr.HandleRequest(req))
 	}
+
+	dslink.Log.Printf("Message is: %+v", r)
 
 	if r != nil {
 		l.cl.out<- r
