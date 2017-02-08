@@ -13,6 +13,6 @@ type Provider interface {
 	HandleRequest(req *Request) *Response
 	SendResponse(resp *Response)
 	AddNode(path string, node Node)
+	RemoveNode(path string) Node
 	//GetOrCreateNode(path string) Node;
 }
-

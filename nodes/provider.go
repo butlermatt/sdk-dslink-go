@@ -33,6 +33,15 @@ func (s *SimpleProvider) AddNode(path string, node dslink.Node) {
 	s.cache[path] = node
 }
 
+func (s *SimpleProvider) RemoveNode(path string) dslink.Node {
+	nd := s.cache[path]
+	if nd != nil {
+		nd.Remove()
+	}
+
+	return nd
+}
+
 func (s *SimpleProvider) SendResponse(resp *dslink.Response) {
 	s.resp<- resp
 }

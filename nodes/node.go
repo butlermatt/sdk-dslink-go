@@ -52,7 +52,7 @@ func (n *SimpleNode) GetConfig(name string) (interface{}, bool) {
 }
 
 func (n *SimpleNode) GetChild(name string) dslink.Node {
-	return nil
+	return n.chld[name]
 }
 
 func (n *SimpleNode) AddChild(node dslink.Node) error {
@@ -70,12 +70,35 @@ func (n *SimpleNode) AddChild(node dslink.Node) error {
 	return nil
 }
 
-func (n *SimpleNode) RemoveChild(name string) error {
-	return nil
+func (n *SimpleNode) Remove() {
+	p := n.Parent
+	n.Parent = nil
+
+	if p != nil {
+		p.RemoveChild(n.name)
+	}
+
+	for name, c := range n.chld {
+		c.Remove()
+		delete(n.chld, name)
+	}
+
+	prov := n.p
+	n.p = nil
+	if prov != nil {
+		prov.RemoveNode(n.path)
+	}
 }
 
-func (n *SimpleNode) RemoveNode(node dslink.Node) error {
-	return nil
+func (n *SimpleNode) RemoveChild(name string) dslink.Node {
+	nd := n.chld[name]
+	delete(n.chld, name)
+
+	if nd != nil {
+		nd.Remove()
+	}
+
+	return nd
 }
 
 func (n *SimpleNode) notifyList(name string, value interface{}) {
