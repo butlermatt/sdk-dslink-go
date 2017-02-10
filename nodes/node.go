@@ -80,6 +80,13 @@ func (n *SimpleNode) RemoveChild(name string) dslink.Node {
 
 	if nd != nil {
 		nd.Remove()
+		n.lMu.RLock()
+		defer n.lMu.RUnlock()
+		for _, i := range n.listSubs {
+			r := dslink.NewResp(i)
+			r.Updates = append(r.Updates, map[string]string{"name": name, "change": "remove"})
+			n.p.SendResponse(r)
+		}
 	}
 
 	return nd
