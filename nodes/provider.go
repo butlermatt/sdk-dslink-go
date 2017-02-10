@@ -51,8 +51,6 @@ func (s *SimpleProvider) SendResponse(resp *dslink.Response) {
 }
 
 func (s *SimpleProvider) HandleRequest(req *dslink.Request) *dslink.Response {
-	dslink.Log.Printf("Received Request: %+v", req)
-
 	switch req.Method {
 	case dslink.MethodList:
 		return s.handleList(req)
