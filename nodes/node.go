@@ -3,6 +3,7 @@ package nodes
 import (
 	"errors"
 	"github.com/butlermatt/dslink"
+	"sync"
 )
 
 type SimpleNode struct {
@@ -14,12 +15,14 @@ type SimpleNode struct {
 	name        string
 	displayName string
 	path        string
-	listSubs    []int32
-	subscribers []int32
 	value       interface{}
 	valType     dslink.ValueType
 	onInvoke    dslink.InvokeFn
 	columns     []map[string]interface{}
+	sMu         sync.Mutex
+	subscribers []int32
+	lMu         sync.Mutex
+	listSubs    []int32
 }
 
 func (n *SimpleNode) GetAttribute(name string) (interface{}, bool) {
@@ -83,7 +86,8 @@ func (n *SimpleNode) RemoveChild(name string) dslink.Node {
 }
 
 func (n *SimpleNode) notifyList(name string, value interface{}) {
-	dslink.Log.Printf("There are %d nodes to notify\n", len(n.listSubs))
+	n.lMu.Lock()
+	defer n.lMu.Unlock()
 	for _, i := range n.listSubs {
 		r := &dslink.Response{Rid: i}
 		r.AddUpdate(name, value)
@@ -92,12 +96,14 @@ func (n *SimpleNode) notifyList(name string, value interface{}) {
 }
 
 func (n *SimpleNode) notifySubs(update *dslink.ValueUpdate) {
-	dslink.Log.Printf("There are %d nodes to notify\n", len(n.subscribers))
+	n.sMu.Lock()
+	defer n.sMu.Unlock()
 	if len(n.subscribers) <= 0 {
 		return
 	}
 
 	r := dslink.NewResp(0)
+
 	for _, i := range n.subscribers {
 		r.AddUpdate(i, update)
 	}
@@ -105,7 +111,10 @@ func (n *SimpleNode) notifySubs(update *dslink.ValueUpdate) {
 }
 
 func (n *SimpleNode) List(request *dslink.Request) *dslink.Response {
+	n.lMu.Lock()
 	n.listSubs = append(n.listSubs, request.Rid)
+	n.lMu.Unlock()
+
 	r := dslink.NewResp(request.Rid)
 	r.Stream = dslink.StreamOpen
 
@@ -132,6 +141,8 @@ func (n *SimpleNode) List(request *dslink.Request) *dslink.Response {
 
 func (n *SimpleNode) Close(request *dslink.Request) {
 	i := -1
+	n.lMu.Lock()
+	defer n.lMu.Unlock()
 	for j, id := range n.listSubs {
 		if id == request.Rid {
 			i = j
@@ -147,11 +158,15 @@ func (n *SimpleNode) Close(request *dslink.Request) {
 }
 
 func (n *SimpleNode) Subscribe(sid int32) {
+	n.sMu.Lock()
+	defer n.sMu.Unlock()
 	n.subscribers = append(n.subscribers, sid)
 }
 
 func (n *SimpleNode) Unsubscribe(sid int32) {
 	i := -1
+	n.sMu.Lock()
+	defer n.sMu.Unlock()
 	for j, id := range n.subscribers {
 		if id == sid {
 			i = j
@@ -285,7 +300,7 @@ func (n *SimpleNode) Invoke(req *dslink.Request) {
 			up = up[:0]
 			n.p.SendResponse(r)
 			r = dslink.NewResp(req.Rid)
-			r.Stream = dslink.StreamOpen
+			//r.Stream = dslink.StreamOpen
 
 		}
 		if retChan == nil {
@@ -309,6 +324,8 @@ func NewNode(name string, provider dslink.Provider) *SimpleNode {
 		attr: make(map[string]interface{}),
 		conf: make(map[dslink.NodeConfig]interface{}),
 		chld: make(map[string]dslink.Node),
+		sMu: sync.Mutex{},
+		lMu: sync.Mutex{},
 	}
 
 	sn.conf[dslink.ConfigIs] = "node"

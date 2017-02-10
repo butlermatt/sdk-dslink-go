@@ -37,6 +37,12 @@ func Provider(p dslink.Provider) func(c *Config) {
 	}
 }
 
+func OnConnected(oc ConnectedCB) func(c *Config) {
+	return func(c *Config) {
+		c.oc = oc
+	}
+}
+
 type Link interface {
 	// Init will initialize the link and setup the various configurations required for the link. This includes
 	// loading the dslink.json and nodes.json files, if available, to populate the nodes.
@@ -61,6 +67,7 @@ type Config struct {
 	logFile     string
 	log         bool
 	provider    dslink.Provider
+	oc          ConnectedCB
 }
 
 func NewLink(prefix string, options ...func(*Config)) Link {
@@ -93,13 +100,15 @@ func NewLink(prefix string, options ...func(*Config)) Link {
 	return &l
 }
 
+type ConnectedCB func(Link)
+
 type link struct {
-	conf Config
-	cl   *httpClient
-	pr   dslink.Provider
-	msgs chan *dslink.Message
-	resp chan *dslink.Response
-	salt string
+	conf  Config
+	cl    *httpClient
+	pr    dslink.Provider
+	msgs  chan *dslink.Message
+	resp  chan *dslink.Response
+	salt  string
 }
 
 type dsJson struct {
@@ -125,12 +134,15 @@ func (l *link) Init() {
 }
 
 func (l *link) Start() {
-	// TODO
 	var err error
 	l.msgs = make(chan *dslink.Message)
 	l.cl, err = dial(&l.conf, l.msgs)
 	if err != nil {
 		panic(err)
+	}
+
+	if l.conf.oc != nil {
+		go l.conf.oc(l)
 	}
 
 	for {
