@@ -63,6 +63,8 @@ func (s *SimpleProvider) HandleRequest(req *dslink.Request) *dslink.Response {
 		return s.handleSub(req)
 	case dslink.MethodUnsub:
 		return s.handleUnsub(req)
+	case dslink.MethodInvoke:
+		s.handleInvoke(req)
 	default:
 		dslink.Log.Printf("Unhandled method: %s", req.Method)
 	}
@@ -72,6 +74,12 @@ func (s *SimpleProvider) HandleRequest(req *dslink.Request) *dslink.Response {
 func (s *SimpleProvider) handleList(req *dslink.Request) *dslink.Response {
 	nd := s.cache[req.Path]
 	s.listResp[req.Rid] = nd
+
+	if nd == nil {
+		r := dslink.NewResp(req.Rid)
+		r.AddUpdate("$is", "node")
+		return r
+	}
 
 	return nd.List(req)
 }
@@ -123,4 +131,12 @@ func (s *SimpleProvider) handleUnsub(req *dslink.Request) *dslink.Response {
 	}
 
 	return r
+}
+
+func (s *SimpleProvider) handleInvoke(req *dslink.Request) {
+	n := s.cache[req.Path]
+	in, ok := n.(dslink.Invokable)
+	if ok {
+		go in.Invoke(req)
+	}
 }

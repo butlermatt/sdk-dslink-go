@@ -43,23 +43,14 @@ func (m *Message) String() string {
 }
 
 type Request struct {
-	Rid    int32      `json:"rid" msgpack:"rid"`
-	Method MethodType `json:"method" msgpack:"method"`
-	Path   string     `json:"path,omitempty" msgpack:"path,omitempty"`
-	Paths  []*SubPath `json:"paths,omitempty" msgpack:"paths,omitempty"`
-	Sids   []int32    `json:"sids,omitempty" msgpack:"sids,omitempty"`
+	Rid    int32                  `json:"rid" msgpack:"rid"`
+	Method MethodType             `json:"method" msgpack:"method"`
+	Path   string                 `json:"path,omitempty" msgpack:"path,omitempty"`
+	Paths  []*SubPath             `json:"paths,omitempty" msgpack:"paths,omitempty"`
+	Sids   []int32                `json:"sids,omitempty" msgpack:"sids,omitempty"`
+	Params map[string]interface{} `json:"params,omitempty" msgpack:"params,omitempty"`
+	Permit string                 `json:"permit,omitempty" msgpack:"permit,omitempty"`
 }
-
-type MethodType string;
-const (
-	MethodList    MethodType = "list"
-	MethodSub     MethodType = "subscribe"
-	MethodUnsub   MethodType = "unsubscribe"
-	MethodClose   MethodType = "close"
-	MethodSet     MethodType = "set"
-	MethodRemove  MethodType = "remove"
-	MethodInvoke  MethodType = "invoke"
-)
 
 func (r *Request) String() string {
 	s := fmt.Sprintf(`{"rid": %d, "method": "%s"`, r.Rid, r.Method)
@@ -77,6 +68,12 @@ func (r *Request) String() string {
 	if len(r.Sids) > 0 {
 		s = fmt.Sprintf(`%s, "sids": %v`, s, r.Sids)
 	}
+	if len(r.Params) > 0 {
+		s = fmt.Sprintf(`%s, "params": %v`, s, r.Params)
+	}
+	if r.Permit != "" {
+		s = fmt.Sprintf(`%s, "permit": %v`, s, r.Permit)
+	}
 	s += "}"
 	return s
 }
@@ -91,7 +88,8 @@ func (sp *SubPath) String() string {
 	return fmt.Sprintf(`{"path": "%s", "sid": %d, "qos": %d}`, sp.Path, sp.Sid, sp.Qos)
 }
 
-type StreamState string;
+type StreamState string
+
 const (
 	StreamInit   StreamState = "initialize"
 	StreamOpen   StreamState = "open"
@@ -99,11 +97,11 @@ const (
 )
 
 type Response struct {
-	Rid     int32               `json:"rid" msgpack:"rid"`
-	Stream  StreamState         `json:"stream" msgpack:"stream"`
-	Updates []interface{}       `json:"updates" msgpack:"updates"`
-	Columns []map[string]string `json:"columns,omitempty" msgpack:"columns,omitempty"`
-	Error   *MsgErr             `json:"error,omitempty" msgpack:"error,omitempty"`
+	Rid     int32                    `json:"rid" msgpack:"rid"`
+	Stream  StreamState              `json:"stream" msgpack:"stream"`
+	Updates []interface{}            `json:"updates" msgpack:"updates"`
+	Columns []map[string]interface{} `json:"columns,omitempty" msgpack:"columns,omitempty"`
+	Error   *MsgErr                  `json:"error,omitempty" msgpack:"error,omitempty"`
 }
 
 func (r *Response) String() string {

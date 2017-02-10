@@ -18,6 +18,8 @@ type SimpleNode struct {
 	subscribers []int32
 	value       interface{}
 	valType     dslink.ValueType
+	onInvoke    dslink.InvokeFn
+	columns     []map[string]interface{}
 }
 
 func (n *SimpleNode) GetAttribute(name string) (interface{}, bool) {
@@ -108,8 +110,18 @@ func (n *SimpleNode) List(request *dslink.Request) *dslink.Response {
 	r.Stream = dslink.StreamOpen
 
 	is, _ := n.GetConfig(dslink.ConfigIs)
-	r.AddUpdate(string(dslink.ConfigIs), is)
+	r.AddUpdate(dslink.ConfigIs, is)
 
+	for k, v := range n.conf {
+		if k == dslink.ConfigIs {
+			continue
+		}
+		r.AddUpdate(k, v)
+	}
+
+	for k, v := range n.attr {
+		r.AddUpdate(k, v)
+	}
 
 	for name, nd := range n.chld {
 		r.AddUpdate(name, nd.ToMap())
@@ -168,6 +180,12 @@ func (n *SimpleNode) ToMap() map[string]interface{} {
 	if n.valType != "" {
 		m[string(dslink.ConfigType)] = n.valType
 	}
+	if n.conf[dslink.ConfigInterface] != nil {
+		m[string(dslink.ConfigInterface)] = n.conf[dslink.ConfigInterface]
+	}
+	if n.conf[dslink.ConfigInvokable] != nil {
+		m[string(dslink.ConfigInvokable)] = n.conf[dslink.ConfigInvokable]
+	}
 
 	// TODO: Check for: invokable, and interface
 
@@ -183,6 +201,34 @@ func (n *SimpleNode) SetType(t dslink.ValueType) {
 	n.valType = t
 }
 
+func (n *SimpleNode) AddAction(fn dslink.InvokeFn, params []dslink.Params, cols []dslink.Column, result string) {
+	n.onInvoke = fn
+	var p []map[string]interface{}
+	for _, v := range params {
+		m := make(map[string]interface{})
+		for k, j := range v {
+			m[string(k)] = j
+		}
+		p = append(p, m)
+	}
+	n.conf[dslink.ConfigParams] = p
+
+	var columns []map[string]interface{}
+	for _, c := range cols {
+		m := make(map[string]interface{})
+		m[string(dslink.ParamName)] = c.Name
+		m[string(dslink.ParamType)] = c.Type
+		if c.Default != nil {
+			m[string(dslink.ParamDef)] = c.Default
+		}
+		columns = append(columns, m)
+	}
+	n.columns = columns
+	n.conf[dslink.ConfigColumns] = columns
+	n.conf[dslink.ConfigInvokable] = dslink.PermWrite
+	n.conf[dslink.ConfigResult] = result
+}
+
 func (n *SimpleNode) UpdateValue(v interface{}) {
 	n.value = v
 	// TODO: Something about the subscription and stuff
@@ -192,6 +238,68 @@ func (n *SimpleNode) UpdateValue(v interface{}) {
 
 func (n *SimpleNode) Value() interface{} {
 	return n.value
+}
+
+func (n *SimpleNode) Invoke(req *dslink.Request) {
+	r := dslink.NewResp(req.Rid)
+	r.Columns = n.columns
+
+	if n.onInvoke == nil {
+		empty := []interface{}{}
+		r.Updates = append(r.Updates, empty)
+		n.p.SendResponse(r)
+		return
+	}
+	rType, _ := n.GetConfig(dslink.ConfigResult)
+	s, _ := rType.(string)
+
+	retChan := make(chan []interface{})
+	go n.onInvoke(req.Params, retChan)
+
+	if s != dslink.ResultStream {
+		r.Stream = dslink.StreamClosed
+		for u := range retChan {
+			r.Updates = append(r.Updates, u)
+		}
+		n.p.SendResponse(r)
+		return
+	}
+
+	var up [][]interface{}
+	r.Stream = dslink.StreamOpen
+	for {
+		select {
+		case data, ok := <-retChan:
+			if !ok {
+				retChan = nil
+			} else {
+				up = append(up, data)
+			}
+		default:
+			if len(up) == 0 {
+				continue
+			}
+			for _, u := range up {
+				r.Updates = append(r.Updates, u)
+			}
+			up = up[:0]
+			n.p.SendResponse(r)
+			r = dslink.NewResp(req.Rid)
+			r.Stream = dslink.StreamOpen
+
+		}
+		if retChan == nil {
+			break
+		}
+	}
+
+	if len(up) > 0 {
+		r.Stream = dslink.StreamClosed
+		for _, u := range up {
+			r.Updates = append(r.Updates, u)
+		}
+		n.p.SendResponse(r)
+	}
 }
 
 func NewNode(name string, provider dslink.Provider) *SimpleNode {

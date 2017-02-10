@@ -19,24 +19,6 @@ type Node interface {
 	ToMap() map[string]interface{}
 }
 
-// ValueType represents the type of value stored by the Node
-type ValueType string
-
-const (
-	// ValueBool indicates this value type is a boolean
-	ValueBool ValueType = "bool"
-	// ValueNum indicates this value type is a number (integer or double)
-	ValueNum ValueType = "num"
-	// ValueString indicates this value type is a String
-	ValueString ValueType = "string"
-	// ValueDynamic indicates this value type is of an undetermined type
-	ValueDynamic ValueType = "dynamic"
-	// ValueDynamic indicates this value type is a Map
-	ValueMap ValueType = "map"
-	// ValueDynamic indicates this value type is an Array
-	ValueArray ValueType = "array"
-)
-
 func GenerateEnumValue(options ...string) ValueType {
 	return ValueType(fmt.Sprintf("enum[%s]", strings.Join(options, ",")))
 }
@@ -56,8 +38,26 @@ type ValueEditor interface {
 	SetEditor(string)
 }
 
+type Column struct {
+	Name    string
+	Type    string
+	Default interface{}
+}
+
+type Params map[ParamVal]interface{}
+
+func (p Params) Get(val ParamVal) interface{} {
+	return p[val]
+}
+
+func (p Params) Set(key ParamVal, val interface{}) {
+	p[key] = val
+}
+
+type InvokeFn func(map[string]interface{}, chan<-[]interface{})
+
 type Invokable interface {
-	Invoke(map[string]interface{})
+	Invoke(*Request)
 }
 
 type ValueUpdate struct {
