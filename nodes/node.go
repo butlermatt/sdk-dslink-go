@@ -10,7 +10,6 @@ type SimpleNode struct {
 	p	    dslink.Provider
 	attr        map[string]interface{}
 	conf        map[dslink.NodeConfig]interface{}
-	chld        map[string]dslink.Node
 	Parent      dslink.Node
 	name        string
 	displayName string
@@ -19,9 +18,10 @@ type SimpleNode struct {
 	valType     dslink.ValueType
 	onInvoke    dslink.InvokeFn
 	columns     []map[string]interface{}
-	sMu         sync.Mutex
+	chld        map[string]dslink.Node
+	sMu         sync.RWMutex
 	subscribers []int32
-	lMu         sync.Mutex
+	lMu         sync.RWMutex
 	listSubs    []int32
 }
 
@@ -86,8 +86,8 @@ func (n *SimpleNode) RemoveChild(name string) dslink.Node {
 }
 
 func (n *SimpleNode) notifyList(name string, value interface{}) {
-	n.lMu.Lock()
-	defer n.lMu.Unlock()
+	n.lMu.RLock()
+	defer n.lMu.RUnlock()
 	for _, i := range n.listSubs {
 		r := &dslink.Response{Rid: i}
 		r.AddUpdate(name, value)
@@ -96,8 +96,8 @@ func (n *SimpleNode) notifyList(name string, value interface{}) {
 }
 
 func (n *SimpleNode) notifySubs(update *dslink.ValueUpdate) {
-	n.sMu.Lock()
-	defer n.sMu.Unlock()
+	n.sMu.RLock()
+	defer n.sMu.RUnlock()
 	if len(n.subscribers) <= 0 {
 		return
 	}
@@ -165,6 +165,7 @@ func (n *SimpleNode) Subscribe(sid int32) {
 
 func (n *SimpleNode) Unsubscribe(sid int32) {
 	i := -1
+
 	n.sMu.Lock()
 	defer n.sMu.Unlock()
 	for j, id := range n.subscribers {
@@ -177,7 +178,6 @@ func (n *SimpleNode) Unsubscribe(sid int32) {
 	if i != -1 {
 		n.subscribers[i] = n.subscribers[len(n.subscribers) - 1]
 		n.subscribers = n.subscribers[:len(n.subscribers) - 1]
-		dslink.Log.Printf("Closed stream for Sid: %d\n", sid)
 	}
 }
 
@@ -232,7 +232,7 @@ func (n *SimpleNode) AddAction(fn dslink.InvokeFn, params []dslink.Params, cols 
 	for _, c := range cols {
 		m := make(map[string]interface{})
 		m[string(dslink.ParamName)] = c.Name
-		m[string(dslink.ParamType)] = c.Type
+		m[string(dslink.ParamType)] = string(c.Type)
 		if c.Default != nil {
 			m[string(dslink.ParamDef)] = c.Default
 		}
@@ -324,8 +324,8 @@ func NewNode(name string, provider dslink.Provider) *SimpleNode {
 		attr: make(map[string]interface{}),
 		conf: make(map[dslink.NodeConfig]interface{}),
 		chld: make(map[string]dslink.Node),
-		sMu: sync.Mutex{},
-		lMu: sync.Mutex{},
+		sMu: sync.RWMutex{},
+		lMu: sync.RWMutex{},
 	}
 
 	sn.conf[dslink.ConfigIs] = "node"

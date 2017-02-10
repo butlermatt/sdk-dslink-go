@@ -8,17 +8,17 @@ import (
 type SimpleProvider struct {
 	root        dslink.Node
 	resp        chan<- *dslink.Response
-	cMu         sync.Mutex
-	cache       map[string]dslink.Node
 	lMu         sync.Mutex
 	listResp    map[int32]dslink.Node
-	sMu         sync.Mutex
+	cMu         sync.RWMutex
+	cache       map[string]dslink.Node
+	sMu         sync.RWMutex
 	subscribers map[int32]dslink.Valued
 }
 
 func (s *SimpleProvider) GetNode(path string) (dslink.Node, bool) {
-	s.cMu.Lock()
-	defer s.cMu.Unlock()
+	s.cMu.RLock()
+	defer s.cMu.RUnlock()
 	nd, ok := s.cache[path]
 	return nd, ok
 }
@@ -36,7 +36,9 @@ func (s *SimpleProvider) AddNode(path string, node dslink.Node) {
 func (s *SimpleProvider) RemoveNode(path string) dslink.Node {
 	s.cMu.Lock()
 	nd := s.cache[path]
+	delete(s.cache, path)
 	s.cMu.Unlock()
+
 	if nd != nil {
 		nd.Remove()
 	}
@@ -69,9 +71,9 @@ func (s *SimpleProvider) HandleRequest(req *dslink.Request) *dslink.Response {
 }
 
 func (s *SimpleProvider) handleList(req *dslink.Request) *dslink.Response {
-	s.cMu.Lock()
+	s.cMu.RLock()
 	nd := s.cache[req.Path]
-	s.cMu.Unlock()
+	s.cMu.RUnlock()
 
 	s.lMu.Lock()
 	s.listResp[req.Rid] = nd
@@ -89,6 +91,7 @@ func (s *SimpleProvider) handleList(req *dslink.Request) *dslink.Response {
 func (s *SimpleProvider) handleClose(req *dslink.Request) {
 	s.lMu.Lock()
 	defer s.lMu.Unlock()
+
 	nd := s.listResp[req.Rid]
 	if nd != nil {
 		nd.Close(req)
@@ -102,9 +105,9 @@ func (s *SimpleProvider) handleSub(req *dslink.Request) *dslink.Response {
 
 	var newSubs []int32
 	for _, p := range req.Paths {
-		s.cMu.Lock()
+		s.cMu.RLock()
 		n := s.cache[p.Path]
-		s.cMu.Unlock()
+		s.cMu.RUnlock()
 
 		v, ok := n.(dslink.Valued)
 		if ok {
@@ -120,9 +123,9 @@ func (s *SimpleProvider) handleSub(req *dslink.Request) *dslink.Response {
 
 	r2 := dslink.NewResp(0)
 	for _, sid := range newSubs {
-		s.sMu.Lock()
+		s.sMu.RLock()
 		v := s.subscribers[sid]
-		s.sMu.Unlock()
+		s.sMu.RUnlock()
 
 		if v != nil {
 			vu := dslink.NewValueUpdate(v.Value())
@@ -153,9 +156,10 @@ func (s *SimpleProvider) handleUnsub(req *dslink.Request) *dslink.Response {
 }
 
 func (s *SimpleProvider) handleInvoke(req *dslink.Request) {
-	s.cMu.Lock()
+	s.cMu.RLock()
 	n := s.cache[req.Path]
-	s.cMu.Unlock()
+	s.cMu.RUnlock()
+
 	in, ok := n.(dslink.Invokable)
 	if ok {
 		go in.Invoke(req)
@@ -167,9 +171,9 @@ func NewProvider(resp chan<- *dslink.Response) *SimpleProvider {
 		cache:       make(map[string]dslink.Node),
 		listResp:    make(map[int32]dslink.Node),
 		subscribers: make(map[int32]dslink.Valued),
-		sMu:         sync.Mutex{},
 		lMu:         sync.Mutex{},
-		cMu:         sync.Mutex{},
+		sMu:         sync.RWMutex{},
+		cMu:         sync.RWMutex{},
 	}
 	r := NewNode("", sp)
 	sp.root = r

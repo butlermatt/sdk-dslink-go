@@ -40,7 +40,7 @@ type ValueEditor interface {
 
 type Column struct {
 	Name    string
-	Type    string
+	Type    ValueType
 	Default interface{}
 }
 
