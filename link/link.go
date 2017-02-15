@@ -108,7 +108,9 @@ type link struct {
 	pr    dslink.Provider
 	msgs  chan *dslink.Message
 	resp  chan *dslink.Response
+	reqs  chan *dslink.Request
 	salt  string
+	reqer dslink.Requester
 }
 
 type dsJson struct {
@@ -116,17 +118,24 @@ type dsJson struct {
 }
 
 func (l *link) Init() {
-	l.resp = make(chan *dslink.Response)
 	if l.conf.name[len(l.conf.name)-1] != '-' {
 		l.conf.name += "-"
 	}
 
-	if l.conf.provider != nil {
-		l.pr = l.conf.provider
-		l.conf.provider = nil
-	} else {
-		l.pr = nodes.NewProvider(l.resp)
+	if l.conf.isResponder {
+		l.resp = make(chan *dslink.Response)
+		if l.conf.provider != nil {
+			l.pr = l.conf.provider
+			l.conf.provider = nil
+		} else {
+			l.pr = nodes.NewProvider(l.resp)
+		}
 	}
+
+	if l.conf.isRequester {
+		// TODO Make requester
+	}
+
 	// TODO:
 	// Load dslink.json
 	l.loadDsJson()

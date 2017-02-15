@@ -53,6 +53,10 @@ type Request struct {
 	Value  interface{}	      `json:"value,omitempty" msgpack:"value,omitempty"`
 }
 
+func NewReq(rid int32, method MethodType) *Request {
+	return &Request{Rid: rid, Method: method}
+}
+
 func (r *Request) String() string {
 	s := fmt.Sprintf(`{"rid": %d, "method": "%s"`, r.Rid, r.Method)
 	if r.Path != "" {
