@@ -50,6 +50,7 @@ type Request struct {
 	Sids   []int32                `json:"sids,omitempty" msgpack:"sids,omitempty"`
 	Params map[string]interface{} `json:"params,omitempty" msgpack:"params,omitempty"`
 	Permit string                 `json:"permit,omitempty" msgpack:"permit,omitempty"`
+	Value  interface{}	      `json:"value,omitempty" msgpack:"value,omitempty"`
 }
 
 func (r *Request) String() string {
@@ -73,6 +74,9 @@ func (r *Request) String() string {
 	}
 	if r.Permit != "" {
 		s = fmt.Sprintf(`%s, "permit": %v`, s, r.Permit)
+	}
+	if r.Value != nil {
+		s = fmt.Sprintf(`%s, "value": %v`, s, r.Value)
 	}
 	s += "}"
 	return s
@@ -143,6 +147,18 @@ type MsgErr struct {
 	Path   string `json:"path" msgpack:"path"`
 	Detail string `json:"detail" msgpack:"detail"`
 }
+
+var (
+	ErrPermissionDenied *MsgErr = &MsgErr{Type: "permissionDenied"}
+	ErrInvalidMethod    *MsgErr = &MsgErr{Type: "invalidMethod"}
+	ErrNotImplemented   *MsgErr = &MsgErr{Type: "notImplemented"}
+	ErrInvalidPath      *MsgErr = &MsgErr{Type: "invalidPath"}
+	ErrInvalidPaths     *MsgErr = &MsgErr{Type: "invalidPaths"}
+	ErrInvalidValue     *MsgErr = &MsgErr{Type: "invalidValue"}
+	ErrInvalidParam     *MsgErr = &MsgErr{Type: "invalidParameter"}
+	ErrDisconnected     *MsgErr = &MsgErr{Type: "disconnected", Phase: "response"}
+	ErrFailed           *MsgErr = &MsgErr{Type: "failed"}
+)
 
 func (e *MsgErr) String() string {
 	return fmt.Sprintf(`{"type": %q, "msg": %q, "phase": %q, "path": %q, "detail": %q`,

@@ -1,15 +1,14 @@
 package dslink
 
 import (
-	"fmt"
-	"strings"
 	"time"
 )
 
 type Node interface {
-	// TODO
 	GetAttribute(string) (interface{}, bool)
+	SetAttribute(string, interface{})
 	GetConfig(NodeConfig) (interface{}, bool)
+	SetConfig(NodeConfig, interface{})
 	AddChild(Node) error
 	RemoveChild(string) Node
 	Remove()
@@ -17,10 +16,6 @@ type Node interface {
 	List(*Request) *Response
 	Close(*Request)
 	ToMap() map[string]interface{}
-}
-
-func GenerateEnumValue(options ...string) ValueType {
-	return ValueType(fmt.Sprintf("enum[%s]", strings.Join(options, ",")))
 }
 
 type Valued interface {
@@ -36,6 +31,14 @@ type ValueEditor interface {
 	Valued
 	GetEditor() string
 	SetEditor(string)
+}
+
+//
+type OnSetValue func(Node, interface{}) bool
+
+type Settable interface {
+	Set(*Request) *MsgErr
+	EnableSet(PermType, OnSetValue)
 }
 
 type Column struct {

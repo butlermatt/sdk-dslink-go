@@ -1,5 +1,9 @@
 package dslink
 
+import (
+	"fmt"
+	"strings"
+)
 
 // ValueType represents the type of value stored by the Node
 type ValueType string
@@ -18,6 +22,10 @@ const (
 	ValueArray ValueType = "array"
 )
 
+func GenerateEnumValue(options ...string) ValueType {
+	return ValueType(fmt.Sprintf("enum[%s]", strings.Join(options, ",")))
+}
+
 const (
 	ResultValues = "values"
 	ResultTable  = "table"
@@ -26,6 +34,24 @@ const (
 
 // PermType is the Permission type.
 type PermType string
+
+func (p PermType) Level() int {
+	switch p {
+	case PermNone:
+		return 0
+	case PermRead:
+		return 1
+	case PermWrite:
+		return 2
+	case PermConfig:
+		return 3
+	case PermNever:
+		return 4
+	default:
+		return -1
+	}
+}
+
 const (
 	// PermNone is permission none.
 	PermNone   PermType = "none"

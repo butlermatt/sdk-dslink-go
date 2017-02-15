@@ -12,7 +12,6 @@ type SimpleNode struct {
 	conf        map[dslink.NodeConfig]interface{}
 	Parent      dslink.Node
 	name        string
-	displayName string
 	path        string
 	value       interface{}
 	valType     dslink.ValueType
@@ -23,6 +22,7 @@ type SimpleNode struct {
 	subscribers []int32
 	lMu         sync.RWMutex
 	listSubs    []int32
+	onSet       dslink.OnSetValue
 }
 
 func (n *SimpleNode) GetAttribute(name string) (interface{}, bool) {
@@ -30,9 +30,21 @@ func (n *SimpleNode) GetAttribute(name string) (interface{}, bool) {
 	return a, ok
 }
 
+func (n *SimpleNode) SetAttribute(name string, v interface{}) {
+	n.attr[name] = v
+}
+
 func (n *SimpleNode) GetConfig(name dslink.NodeConfig) (interface{}, bool) {
 	c, ok := n.conf[name]
 	return c, ok
+}
+
+func (n *SimpleNode) SetConfig(name dslink.NodeConfig, value interface{}) {
+	n.conf[name] = value
+}
+
+func (n *SimpleNode) SetDisplayName(name string) {
+	n.SetConfig(dslink.ConfigName, name)
 }
 
 func (n *SimpleNode) GetChild(name string) dslink.Node {
@@ -264,6 +276,27 @@ func (n *SimpleNode) Value() interface{} {
 
 func (n *SimpleNode) Invoke(req *dslink.Request) {
 	r := dslink.NewResp(req.Rid)
+
+	perm := dslink.PermType(req.Permit)
+	if perm == "" || perm.Level() == -1 {
+		perm = dslink.PermConfig
+	}
+
+	pr, ok := n.GetConfig(dslink.ConfigInvokable)
+	prs, _ := pr.(string)
+	if !ok {
+		r.Error = dslink.ErrInvalidMethod
+		n.p.SendResponse(r)
+		return
+	}
+
+	permReq := dslink.PermType(prs)
+	if perm.Level() < permReq.Level() {
+		r.Error = dslink.ErrPermissionDenied
+		n.p.SendResponse(r)
+		return
+	}
+
 	r.Columns = n.columns
 
 	if n.onInvoke == nil {
@@ -322,6 +355,38 @@ func (n *SimpleNode) Invoke(req *dslink.Request) {
 		}
 		n.p.SendResponse(r)
 	}
+}
+
+func (n *SimpleNode) Set(req *dslink.Request) *dslink.MsgErr {
+	perm := dslink.PermType(req.Permit)
+	if perm == "" || perm.Level() == -1 {
+		perm = dslink.PermConfig
+	}
+
+	pr, ok := n.GetConfig(dslink.ConfigWritable)
+	prs, _ := pr.(string)
+	if !ok {
+		return dslink.ErrInvalidValue
+	}
+
+	permReq := dslink.PermType(prs)
+	if perm.Level() < permReq.Level() {
+		return dslink.ErrPermissionDenied
+	}
+
+	ok = n.onSet(n, req.Value)
+	if !ok {
+		return nil
+	}
+
+	n.UpdateValue(req.Value)
+
+	return nil
+}
+
+func (n *SimpleNode) EnableSet(perm dslink.PermType, onSet dslink.OnSetValue) {
+	n.conf[dslink.ConfigWritable] = perm
+	n.onSet = onSet
 }
 
 func NewNode(name string, provider dslink.Provider) *SimpleNode {

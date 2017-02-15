@@ -62,6 +62,8 @@ func (s *SimpleProvider) HandleRequest(req *dslink.Request) *dslink.Response {
 		return s.handleUnsub(req)
 	case dslink.MethodInvoke:
 		s.handleInvoke(req)
+	case dslink.MethodSet:
+		s.handleSet(req)
 	default:
 		dslink.Log.Printf("Unhandled method: %s", req.Method)
 	}
@@ -159,8 +161,34 @@ func (s *SimpleProvider) handleInvoke(req *dslink.Request) {
 	s.cMu.RUnlock()
 
 	in, ok := n.(dslink.Invokable)
-	if ok {
-		go in.Invoke(req)
+	if !ok {
+		r := dslink.NewResp(req.Rid)
+		r.Error = dslink.ErrInvalidMethod
+		s.resp<- r
+		return
+	}
+
+	go in.Invoke(req)
+}
+
+func (s *SimpleProvider) handleSet(req *dslink.Request) {
+	s.cMu.RLock()
+	n := s.cache[req.Path]
+	s.cMu.RUnlock()
+
+	se, ok := n.(dslink.Settable)
+	if !ok {
+		r := dslink.NewResp(req.Rid)
+		r.Error = dslink.ErrInvalidValue
+		s.SendResponse(r)
+		return
+	}
+
+	err := se.Set(req)
+	if err != nil {
+		r := dslink.NewResp(req.Rid)
+		r.Error = err
+		s.SendResponse(r)
 	}
 }
 
