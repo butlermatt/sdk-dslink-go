@@ -7,7 +7,7 @@ import (
 
 type SimpleProvider struct {
 	root        dslink.Node
-	resp        chan<- *dslink.Response
+	c           chan<- *dslink.Response
 	lMu         sync.Mutex
 	listResp    map[int32]dslink.Node
 	cMu         sync.RWMutex
@@ -16,23 +16,30 @@ type SimpleProvider struct {
 	subscribers map[int32]dslink.Valued
 }
 
-func (s *SimpleProvider) GetNode(path string) (dslink.Node, bool) {
+// GetNode will attempt to return the Node located at the Specified path.
+func (s *SimpleProvider) GetNode(path string) dslink.Node {
 	s.cMu.RLock()
 	defer s.cMu.RUnlock()
-	nd, ok := s.cache[path]
-	return nd, ok
+	nd := s.cache[path]
+	return nd
 }
 
+// GetRoot returns the root node of this DSLink when run as a Responder.
 func (s *SimpleProvider) GetRoot() dslink.Node {
 	return s.root
 }
 
+// AddNode will add the specified node on the specified path. However it will not establish the appropriate
+// parent/child relationship and nodes should be added directly from other nodes.
 func (s *SimpleProvider) AddNode(path string, node dslink.Node) {
 	s.cMu.Lock()
 	defer s.cMu.Unlock()
 	s.cache[path] = node
 }
 
+// RemoveNode will remove the node at the specified path. It will return the node which was removed. It will
+// also attempt to call Remove on the Node itself to ensure the parent/child associations are cleaned up as
+// well.
 func (s *SimpleProvider) RemoveNode(path string) dslink.Node {
 	s.cMu.Lock()
 	nd := s.cache[path]
@@ -46,10 +53,14 @@ func (s *SimpleProvider) RemoveNode(path string) dslink.Node {
 	return nd
 }
 
+// SendResponse is used by provider and node implementations for Responders to send an async response back to the
+// remote requester.
 func (s *SimpleProvider) SendResponse(resp *dslink.Response) {
-	s.resp <- resp
+	s.c <- resp
 }
 
+// HandleRequest must be implemented by a Responder to handle incoming requests. It may return a Response
+// directly or it may return nil and send an async response with SendResponse.
 func (s *SimpleProvider) HandleRequest(req *dslink.Request) *dslink.Response {
 	switch req.Method {
 	case dslink.MethodList:
@@ -164,7 +175,7 @@ func (s *SimpleProvider) handleInvoke(req *dslink.Request) {
 	if !ok {
 		r := dslink.NewResp(req.Rid)
 		r.Error = dslink.ErrInvalidMethod
-		s.resp<- r
+		s.c<- r
 		return
 	}
 
@@ -192,6 +203,8 @@ func (s *SimpleProvider) handleSet(req *dslink.Request) {
 	}
 }
 
+// NewProvider returns a new SimpleProvider which is a simple implementation of the Provider and Node interfaces.
+// It receives a Response sending channel to return asynchronous Responses to requests.
 func NewProvider(resp chan<- *dslink.Response) *SimpleProvider {
 	sp := &SimpleProvider{
 		cache:       make(map[string]dslink.Node),
@@ -204,7 +217,7 @@ func NewProvider(resp chan<- *dslink.Response) *SimpleProvider {
 	r := NewNode("", sp)
 	sp.root = r
 	sp.cache["/"] = r
-	sp.resp = resp
+	sp.c = resp
 	return sp
 }
 

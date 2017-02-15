@@ -43,10 +43,6 @@ func (n *SimpleNode) SetConfig(name dslink.NodeConfig, value interface{}) {
 	n.conf[name] = value
 }
 
-func (n *SimpleNode) SetDisplayName(name string) {
-	n.SetConfig(dslink.ConfigName, name)
-}
-
 func (n *SimpleNode) GetChild(name string) dslink.Node {
 	return n.chld[name]
 }
@@ -220,8 +216,6 @@ func (n *SimpleNode) ToMap() map[string]interface{} {
 	if n.conf[dslink.ConfigInvokable] != nil {
 		m[string(dslink.ConfigInvokable)] = n.conf[dslink.ConfigInvokable]
 	}
-
-	// TODO: Check for: invokable, and interface
 
 	return m
 }
