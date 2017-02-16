@@ -19,4 +19,8 @@ type Provider interface {
 
 type Requester interface {
 	// TODO
+	HandleResponse(*Response)
+	SendRequest(*Request, chan *Response)
+	CloseRequest(int32)
+	GetRemoteNode(string) (Node, error)
 }
