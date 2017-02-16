@@ -13,9 +13,15 @@ type Node interface {
 	RemoveChild(string) Node
 	Remove()
 	GetChild(string) Node
+}
+
+type Mapper interface {
+	ToMap() map[string]interface{}
+}
+
+type Lister interface {
 	List(*Request) *Response
 	Close(*Request)
-	ToMap() map[string]interface{}
 }
 
 type Valued interface {

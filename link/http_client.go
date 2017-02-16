@@ -12,17 +12,18 @@ import (
 )
 
 import (
+	"bytes"
+	"github.com/butlermatt/dslink"
 	"github.com/butlermatt/dslink/crypto"
 	"github.com/gorilla/websocket"
 	"gopkg.in/vmihailenco/msgpack.v2"
-	"bytes"
-	"github.com/butlermatt/dslink"
 )
 
 const pingTime = 30 * time.Second
 const maxMsgId = 0x7FFFFFFF
 
-type msgFormat int;
+type msgFormat int
+
 const (
 	fmtJson msgFormat = iota
 	fmtMsgP
@@ -51,26 +52,28 @@ type dsResp struct {
 }
 
 type httpClient struct {
-	enc      encode
-	dec      decode
-	encBuf	 bytes.Buffer
-	decBuf	 bytes.Buffer
-	dsId     string
-	msgId    int32
-	reqId    uint32
-	keyMaker crypto.ECDH
-	htClient *http.Client
-	rawUrl   *url.URL
-	home     string
-	token    string
-	tHash    string
-	wsClient *websocket.Conn
-	cPriv    crypto.PrivateKey
-	in       chan []byte
-	out      chan *dslink.Message
-	ping     *time.Timer
-	msgs     chan *dslink.Message
-	format   msgFormat
+	enc       encode
+	dec       decode
+	encBuf    bytes.Buffer
+	decBuf    bytes.Buffer
+	dsId      string
+	msgId     int32
+	reqId     uint32
+	keyMaker  crypto.ECDH
+	htClient  *http.Client
+	rawUrl    *url.URL
+	home      string
+	token     string
+	tHash     string
+	wsClient  *websocket.Conn
+	cPriv     crypto.PrivateKey
+	in        chan []byte
+	out       chan *dslink.Message
+	ping      *time.Timer
+	msgs      chan *dslink.Message
+	format    msgFormat
+	responder bool
+	requester bool
 }
 
 // Close will force the Websocket on the httpClient to be closed.
@@ -93,9 +96,9 @@ func (c *httpClient) getWsConfig() (*dsResp, error) {
 	u.RawQuery = q.Encode()
 
 	// TODO: Put this in a struct!
-	values := fmt.Sprintf("{\"publicKey\": \"%s\", \"isRequester\": false, \"isResponder\": true,"+
+	values := fmt.Sprintf("{\"publicKey\": \"%s\", \"isRequester\": %t, \"isResponder\": %t,"+
 		"\"linkData\": {}, \"version\": \"1.1.2\", \"formats\": [\"msgpack\",\"json\"], \"enableWebSocketCompression\": true}",
-		c.cPriv.PublicKey.Base64())
+		c.cPriv.PublicKey.Base64(), c.requester, c.responder)
 	res, err := c.htClient.Post(u.String(), "application/json", strings.NewReader(values))
 	if err != nil {
 		return nil, fmt.Errorf("Error connecting to address: \"%s\"\nError: %s", c.rawUrl, err)
@@ -246,11 +249,13 @@ func dial(conf *Config, msgs chan *dslink.Message) (*httpClient, error) {
 	}
 
 	c := &httpClient{
-		keyMaker: crypto.NewECDH(),
-		htClient: &http.Client{Timeout: time.Second * 60},
-		rawUrl:   u,
-		home:     conf.home,
-		msgs:     msgs,
+		keyMaker:  crypto.NewECDH(),
+		htClient:  &http.Client{Timeout: time.Second * 60},
+		rawUrl:    u,
+		home:      conf.home,
+		msgs:      msgs,
+		responder: conf.isResponder,
+		requester: conf.isRequester,
 	}
 
 	// TODO: The keys should be managed outside of the httpClient and

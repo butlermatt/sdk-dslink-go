@@ -51,6 +51,7 @@ type Link interface {
 	Start()
 	Stop()
 	GetProvider() dslink.Provider
+	GetRequester() dslink.Requester
 }
 
 // TODO: Provide some kind of config option for logger and logger level
@@ -110,7 +111,8 @@ type link struct {
 	resp  chan *dslink.Response
 	reqs  chan *dslink.Request
 	salt  string
-	reqer dslink.Requester
+	reqer *nodes.Requester
+	init  bool
 }
 
 type dsJson struct {
@@ -133,7 +135,8 @@ func (l *link) Init() {
 	}
 
 	if l.conf.isRequester {
-		// TODO Make requester
+		l.reqs = make(chan *dslink.Request)
+		l.reqer = nodes.NewRequester(l.reqs)
 	}
 
 	// TODO:
@@ -150,18 +153,20 @@ func (l *link) Start() {
 		panic(err)
 	}
 
-	if l.conf.oc != nil {
-		go l.conf.oc(l)
-	}
-
 	for {
 		select {
 		case im := <-l.msgs:
 			go l.handleMessage(im)
-		case or := <-l.resp:
+		case oresp := <-l.resp:
 			m := &dslink.Message{}
-			if or != nil {
-				m.Resp = append(m.Resp, or)
+			if oresp != nil {
+				m.Resp = append(m.Resp, oresp)
+				l.cl.out <- m
+			}
+		case oreq := <-l.reqs:
+			m := &dslink.Message{}
+			if oreq != nil {
+				m.Reqs = append(m.Reqs, oreq)
 				l.cl.out <- m
 			}
 		}
@@ -176,28 +181,46 @@ func (l *link) GetProvider() dslink.Provider {
 	return l.pr
 }
 
+func (l *link) GetRequester() dslink.Requester {
+	return l.reqer
+}
+
 func (l *link) handleMessage(m *dslink.Message) {
-	var r *dslink.Message
+	var ackM *dslink.Message
 
 	if len(m.Reqs) == 0 && len(m.Resp) == 0 && m.Salt == "" {
 		// Ignore message.
 		return
 	}
 
-	r = &dslink.Message{Ack: m.Msg}
+	if l.reqer != nil {
+		for _, resp := range m.Resp {
+			l.reqer.HandleResponse(resp)
+		}
+	} else if len(m.Resp) > 0 {
+		log.Println("Received responses when no requester active.")
+	}
+
+	ackM = &dslink.Message{Ack: m.Msg}
 	if m.Salt != "" {
 		l.salt = m.Salt
+		if !l.init {
+			l.init = true
+			if l.conf.oc != nil {
+				go l.conf.oc(l)
+			}
+		}
 	}
 
 	for _, req := range m.Reqs {
 		res := l.pr.HandleRequest(req)
 		if res != nil {
-			r.Resp = append(r.Resp, res)
+			ackM.Resp = append(ackM.Resp, res)
 		}
 	}
 
-	if r != nil {
-		l.cl.out<- r
+	if ackM != nil {
+		l.cl.out<- ackM
 	}
 }
 

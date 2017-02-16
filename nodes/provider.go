@@ -9,7 +9,7 @@ type SimpleProvider struct {
 	root        dslink.Node
 	c           chan<- *dslink.Response
 	lMu         sync.Mutex
-	listResp    map[int32]dslink.Node
+	listResp    map[int32]dslink.Lister
 	cMu         sync.RWMutex
 	cache       map[string]dslink.Node
 	sMu         sync.RWMutex
@@ -86,8 +86,21 @@ func (s *SimpleProvider) handleList(req *dslink.Request) *dslink.Response {
 	nd := s.cache[req.Path]
 	s.cMu.RUnlock()
 
+	if nd == nil {
+		r := dslink.NewResp(req.Rid)
+		r.Error = dslink.ErrInvalidPath
+		return r
+	}
+
+	lNd, ok := nd.(dslink.Lister)
+	if !ok {
+		r := dslink.NewResp(req.Rid)
+		r.Error = dslink.ErrInvalidPath
+		return r
+	}
+
 	s.lMu.Lock()
-	s.listResp[req.Rid] = nd
+	s.listResp[req.Rid] = lNd
 	s.lMu.Unlock()
 
 	if nd == nil {
@@ -96,7 +109,7 @@ func (s *SimpleProvider) handleList(req *dslink.Request) *dslink.Response {
 		return r
 	}
 
-	return nd.List(req)
+	return lNd.List(req)
 }
 
 func (s *SimpleProvider) handleClose(req *dslink.Request) {
@@ -208,7 +221,7 @@ func (s *SimpleProvider) handleSet(req *dslink.Request) {
 func NewProvider(resp chan<- *dslink.Response) *SimpleProvider {
 	sp := &SimpleProvider{
 		cache:       make(map[string]dslink.Node),
-		listResp:    make(map[int32]dslink.Node),
+		listResp:    make(map[int32]dslink.Lister),
 		subscribers: make(map[int32]dslink.Valued),
 		lMu:         sync.Mutex{},
 		sMu:         sync.RWMutex{},

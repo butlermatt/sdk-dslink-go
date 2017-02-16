@@ -148,7 +148,11 @@ func (n *SimpleNode) List(request *dslink.Request) *dslink.Response {
 	}
 
 	for name, nd := range n.chld {
-		r.AddUpdate(name, nd.ToMap())
+		m, ok := nd.(dslink.Mapper)
+		if !ok {
+			continue
+		}
+		r.AddUpdate(name, m.ToMap())
 	}
 
 	return r
