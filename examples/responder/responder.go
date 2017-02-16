@@ -41,7 +41,7 @@ func main() {
 	n.UpdateValue("Hello World")
 	n.EnableSet(dslink.PermWrite, func(n dslink.Node, v interface{}) bool {
 		dslink.Log.Printf("Going to set value: %v", v)
-		return false
+		return true
 	})
 	root.AddChild(n)
 
