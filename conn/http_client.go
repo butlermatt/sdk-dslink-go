@@ -1,4 +1,4 @@
-package link
+package conn
 
 import (
 	"crypto/rand"
@@ -240,7 +240,7 @@ func (c *httpClient) handleConnections() {
 	}
 }
 
-// Dial will attempt to connect a link with the specified prefix to the specified address.
+// Dial will attempt to connect a Link with the specified prefix to the specified address.
 // Returns an error if connection handshake fails. Otherwise returns the connected httpClient.
 func dial(conf *Config, msgs chan *dslink.Message) (*httpClient, error) {
 	u, err := url.Parse(conf.broker)

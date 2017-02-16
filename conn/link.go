@@ -1,4 +1,4 @@
-package link
+package conn
 
 import (
 	"encoding/json"
@@ -31,9 +31,9 @@ func Logger(l *lg.Logger) func(c *Config) {
 	}
 }
 
-func Provider(p dslink.Provider) func(c *Config) {
+func Provider(p dslink.Responder) func(c *Config) {
 	return func(c *Config) {
-		c.provider = p
+		c.responder = p
 	}
 }
 
@@ -43,16 +43,16 @@ func OnConnected(oc ConnectedCB) func(c *Config) {
 	}
 }
 
-type Link interface {
-	// Init will initialize the link and setup the various configurations required for the link. This includes
-	// loading the dslink.json and nodes.json files, if available, to populate the nodes.
-	Init()
-	// Start will start the link to establish connection to the broker.
-	Start()
-	Stop()
-	GetProvider() dslink.Provider
-	GetRequester() dslink.Requester
-}
+//type Link interface {
+//	// Init will initialize the Link and setup the various configurations required for the Link. This includes
+//	// loading the dslink.json and nodes.json files, if available, to populate the nodes.
+//	Init()
+//	// Start will start the Link to establish connection to the broker.
+//	Start()
+//	Stop()
+//	GetProvider() dslink.Provider
+//	GetRequester() *nodes.Requester
+//}
 
 // TODO: Provide some kind of config option for logger and logger level
 type Config struct {
@@ -67,12 +67,12 @@ type Config struct {
 	keyPath	    string
 	logFile     string
 	log         bool
-	provider    dslink.Provider
+	responder   dslink.Responder
 	oc          ConnectedCB
 }
 
-func NewLink(prefix string, options ...func(*Config)) Link {
-	var l link
+func NewLink(prefix string, options ...func(*Config)) *Link {
+	var l Link
 
 	// Handle Options passed
 	l.conf.isResponder = true
@@ -101,12 +101,12 @@ func NewLink(prefix string, options ...func(*Config)) Link {
 	return &l
 }
 
-type ConnectedCB func(Link)
+type ConnectedCB func(*Link)
 
-type link struct {
+type Link struct {
 	conf  Config
 	cl    *httpClient
-	pr    dslink.Provider
+	pr    dslink.Responder
 	msgs  chan *dslink.Message
 	resp  chan *dslink.Response
 	reqs  chan *dslink.Request
@@ -119,16 +119,16 @@ type dsJson struct {
 	Config map[string]map[string]string `json:"configs"`
 }
 
-func (l *link) Init() {
+func (l *Link) Init() {
 	if l.conf.name[len(l.conf.name)-1] != '-' {
 		l.conf.name += "-"
 	}
 
 	if l.conf.isResponder {
 		l.resp = make(chan *dslink.Response)
-		if l.conf.provider != nil {
-			l.pr = l.conf.provider
-			l.conf.provider = nil
+		if l.conf.responder != nil {
+			l.pr = l.conf.responder
+			l.conf.responder = nil
 		} else {
 			l.pr = nodes.NewProvider(l.resp)
 		}
@@ -145,7 +145,7 @@ func (l *link) Init() {
 	// load nodes.json
 }
 
-func (l *link) Start() {
+func (l *Link) Start() {
 	var err error
 	l.msgs = make(chan *dslink.Message)
 	l.cl, err = dial(&l.conf, l.msgs)
@@ -173,19 +173,23 @@ func (l *link) Start() {
 	}
 }
 
-func (l *link) Stop() {
+func (l *Link) Stop() {
 	l.cl.Close()
 }
 
-func (l *link) GetProvider() dslink.Provider {
-	return l.pr
+func (l *Link) GetProvider() dslink.Provider {
+	prov, ok := l.pr.(dslink.Provider)
+	if !ok {
+		return nil
+	}
+	return prov
 }
 
-func (l *link) GetRequester() dslink.Requester {
+func (l *Link) GetRequester() *nodes.Requester {
 	return l.reqer
 }
 
-func (l *link) handleMessage(m *dslink.Message) {
+func (l *Link) handleMessage(m *dslink.Message) {
 	var ackM *dslink.Message
 
 	if len(m.Reqs) == 0 && len(m.Resp) == 0 && m.Salt == "" {
@@ -224,7 +228,7 @@ func (l *link) handleMessage(m *dslink.Message) {
 	}
 }
 
-func (l *link) loadDsJson() {
+func (l *Link) loadDsJson() {
 	if l.conf.rootPath != "" {
 		err := os.Chdir(l.conf.rootPath)
 		if err != nil {
