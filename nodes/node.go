@@ -6,8 +6,8 @@ import (
 	"sync"
 )
 
-type SimpleNode struct {
-	p	    dslink.Provider
+type LocalNode struct {
+	p	    *Provider
 	attr        map[string]interface{}
 	conf        map[dslink.NodeConfig]interface{}
 	Parent      dslink.Node
@@ -25,30 +25,46 @@ type SimpleNode struct {
 	onSet       dslink.OnSetValue
 }
 
-func (n *SimpleNode) GetAttribute(name string) (interface{}, bool) {
+func (n *LocalNode) Name() string {
+	return n.name
+}
+
+func (n *LocalNode) Attributes() map[string]interface{} {
+	return n.attr
+}
+
+func (n *LocalNode) GetAttribute(name string) (interface{}, bool) {
 	a, ok := n.attr[name]
 	return a, ok
 }
 
-func (n *SimpleNode) SetAttribute(name string, v interface{}) {
+func (n *LocalNode) SetAttribute(name string, v interface{}) {
 	n.attr[name] = v
 }
 
-func (n *SimpleNode) GetConfig(name dslink.NodeConfig) (interface{}, bool) {
+func (n *LocalNode) Configs() map[dslink.NodeConfig]interface{} {
+	return n.conf
+}
+
+func (n *LocalNode) GetConfig(name dslink.NodeConfig) (interface{}, bool) {
 	c, ok := n.conf[name]
 	return c, ok
 }
 
-func (n *SimpleNode) SetConfig(name dslink.NodeConfig, value interface{}) {
+func (n *LocalNode) SetConfig(name dslink.NodeConfig, value interface{}) {
 	n.conf[name] = value
 }
 
-func (n *SimpleNode) GetChild(name string) dslink.Node {
+func (n *LocalNode) Children() map[string]dslink.Node {
+	return n.chld
+}
+
+func (n *LocalNode) GetChild(name string) dslink.Node {
 	return n.chld[name]
 }
 
-func (n *SimpleNode) AddChild(node dslink.Node) error {
-	sn, ok := node.(*SimpleNode)
+func (n *LocalNode) AddChild(node dslink.Node) error {
+	sn, ok := node.(*LocalNode)
 	if !ok {
 		return errors.New("Can't add unknown node type")
 	}
@@ -62,7 +78,7 @@ func (n *SimpleNode) AddChild(node dslink.Node) error {
 	return nil
 }
 
-func (n *SimpleNode) Remove() {
+func (n *LocalNode) Remove() {
 	p := n.Parent
 	n.Parent = nil
 
@@ -82,7 +98,7 @@ func (n *SimpleNode) Remove() {
 	}
 }
 
-func (n *SimpleNode) RemoveChild(name string) dslink.Node {
+func (n *LocalNode) RemoveChild(name string) dslink.Node {
 	nd := n.chld[name]
 	delete(n.chld, name)
 
@@ -100,7 +116,7 @@ func (n *SimpleNode) RemoveChild(name string) dslink.Node {
 	return nd
 }
 
-func (n *SimpleNode) notifyList(name string, value interface{}) {
+func (n *LocalNode) notifyList(name string, value interface{}) {
 	n.lMu.RLock()
 	defer n.lMu.RUnlock()
 	for _, i := range n.listSubs {
@@ -110,7 +126,7 @@ func (n *SimpleNode) notifyList(name string, value interface{}) {
 	}
 }
 
-func (n *SimpleNode) notifySubs(update *dslink.ValueUpdate) {
+func (n *LocalNode) notifySubs(update *dslink.ValueUpdate) {
 	n.sMu.RLock()
 	defer n.sMu.RUnlock()
 	if len(n.subscribers) <= 0 {
@@ -125,7 +141,7 @@ func (n *SimpleNode) notifySubs(update *dslink.ValueUpdate) {
 	n.p.SendResponse(r)
 }
 
-func (n *SimpleNode) List(request *dslink.Request) *dslink.Response {
+func (n *LocalNode) List(request *dslink.Request) *dslink.Response {
 	n.lMu.Lock()
 	n.listSubs = append(n.listSubs, request.Rid)
 	n.lMu.Unlock()
@@ -158,7 +174,7 @@ func (n *SimpleNode) List(request *dslink.Request) *dslink.Response {
 	return r
 }
 
-func (n *SimpleNode) Close(request *dslink.Request) {
+func (n *LocalNode) Close(request *dslink.Request) {
 	i := -1
 	n.lMu.Lock()
 	defer n.lMu.Unlock()
@@ -172,17 +188,17 @@ func (n *SimpleNode) Close(request *dslink.Request) {
 	if i != -1 {
 		n.listSubs[i] = n.listSubs[len(n.listSubs) - 1]
 		n.listSubs = n.listSubs[:len(n.listSubs) - 1]
-		dslink.Log.Printf("Closed link for Rid: %d\n", request.Rid)
+		dslink.Log.Printf("Closed conn for Rid: %d\n", request.Rid)
 	}
 }
 
-func (n *SimpleNode) Subscribe(sid int32) {
+func (n *LocalNode) Subscribe(sid int32) {
 	n.sMu.Lock()
 	defer n.sMu.Unlock()
 	n.subscribers = append(n.subscribers, sid)
 }
 
-func (n *SimpleNode) Unsubscribe(sid int32) {
+func (n *LocalNode) Unsubscribe(sid int32) {
 	i := -1
 
 	n.sMu.Lock()
@@ -200,7 +216,7 @@ func (n *SimpleNode) Unsubscribe(sid int32) {
 	}
 }
 
-func (n *SimpleNode) ToMap() map[string]interface{} {
+func (n *LocalNode) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 	m[string(dslink.ConfigIs)] = n.conf[dslink.ConfigIs]
 	name, ok := n.conf[dslink.ConfigName]
@@ -224,16 +240,16 @@ func (n *SimpleNode) ToMap() map[string]interface{} {
 	return m
 }
 
-func (n *SimpleNode) GetType() dslink.ValueType {
+func (n *LocalNode) GetType() dslink.ValueType {
 	return n.valType
 }
 
-func (n *SimpleNode) SetType(t dslink.ValueType) {
+func (n *LocalNode) SetType(t dslink.ValueType) {
 	n.conf[dslink.ConfigType] = t
 	n.valType = t
 }
 
-func (n *SimpleNode) AddAction(fn dslink.InvokeFn, params []dslink.Params, cols []dslink.Column, result string) {
+func (n *LocalNode) AddAction(fn dslink.InvokeFn, params []dslink.Params, cols []dslink.Column, result string) {
 	n.onInvoke = fn
 	var p []map[string]interface{}
 	for _, v := range params {
@@ -261,18 +277,18 @@ func (n *SimpleNode) AddAction(fn dslink.InvokeFn, params []dslink.Params, cols 
 	n.conf[dslink.ConfigResult] = result
 }
 
-func (n *SimpleNode) UpdateValue(v interface{}) {
+func (n *LocalNode) UpdateValue(v interface{}) {
 	n.value = v
 	// TODO: Something about the subscription and stuff
 	val := dslink.NewValueUpdate(v)
 	n.notifySubs(val)
 }
 
-func (n *SimpleNode) Value() interface{} {
+func (n *LocalNode) Value() interface{} {
 	return n.value
 }
 
-func (n *SimpleNode) Invoke(req *dslink.Request) {
+func (n *LocalNode) Invoke(req *dslink.Request) {
 	r := dslink.NewResp(req.Rid)
 
 	perm := dslink.PermType(req.Permit)
@@ -355,7 +371,7 @@ func (n *SimpleNode) Invoke(req *dslink.Request) {
 	}
 }
 
-func (n *SimpleNode) Set(req *dslink.Request) *dslink.MsgErr {
+func (n *LocalNode) Set(req *dslink.Request) *dslink.MsgErr {
 	perm := dslink.PermType(req.Permit)
 	if perm == "" || perm.Level() == -1 {
 		perm = dslink.PermConfig
@@ -382,13 +398,13 @@ func (n *SimpleNode) Set(req *dslink.Request) *dslink.MsgErr {
 	return nil
 }
 
-func (n *SimpleNode) EnableSet(perm dslink.PermType, onSet dslink.OnSetValue) {
+func (n *LocalNode) EnableSet(perm dslink.PermType, onSet dslink.OnSetValue) {
 	n.conf[dslink.ConfigWritable] = perm
 	n.onSet = onSet
 }
 
-func NewNode(name string, provider dslink.Provider) *SimpleNode {
-	sn := &SimpleNode{
+func NewNode(name string, provider *Provider) *LocalNode {
+	sn := &LocalNode{
 		name: name,
 		p:    provider,
 		attr: make(map[string]interface{}),

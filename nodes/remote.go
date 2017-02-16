@@ -13,7 +13,15 @@ type RemoteNode struct {
 	cMu  sync.RWMutex
 	conf map[dslink.NodeConfig]interface{}
 	cdMu sync.RWMutex
-	chdn map[string]*RemoteNode
+	chdn map[string]dslink.Node
+}
+
+func (n *RemoteNode) Name() string {
+	return n.name
+}
+
+func (n *RemoteNode) Attributes() map[string]interface{} {
+	return n.attr
 }
 
 func (n *RemoteNode) GetAttribute(name string) (interface{}, bool) {
@@ -30,6 +38,10 @@ func (n *RemoteNode) SetAttribute(name string, v interface{}) {
 	n.attr[name] = v
 }
 
+func (n *RemoteNode) Configs() map[dslink.NodeConfig]interface{} {
+	return n.conf
+}
+
 func (n *RemoteNode) GetConfig(c dslink.NodeConfig) (interface{}, bool) {
 	n.cMu.RLock()
 	defer n.cMu.RUnlock()
@@ -43,6 +55,10 @@ func (n *RemoteNode) SetConfig(c dslink.NodeConfig, v interface{}) {
 	defer n.cMu.Unlock()
 
 	n.conf[c] = v
+}
+
+func (n *RemoteNode) Children() map[string]dslink.Node {
+	return n.chdn
 }
 
 func (n *RemoteNode) AddChild(node dslink.Node) error {
@@ -78,4 +94,29 @@ func (n *RemoteNode) GetChild(p string) dslink.Node {
 	defer n.cdMu.RUnlock()
 
 	return n.chdn[p]
+}
+
+func NewRemoteNode(p string) *RemoteNode {
+	r := &RemoteNode{
+		name: PathName(p),
+		conf: make(map[dslink.NodeConfig]interface{}),
+		attr: make(map[string]interface{}),
+		chdn: make(map[string]dslink.Node),
+	}
+	return r
+}
+
+func NewRemoteFromMap(n string, m map[interface{}]interface{}) *RemoteNode {
+	r := NewRemoteNode(n)
+	for k, v := range m {
+		nm, _ := k.(string)
+		switch nm[0] {
+		case '$':
+			r.SetConfig(dslink.NodeConfig(nm), v)
+		case '@':
+			r.SetAttribute(nm, v)
+		}
+	}
+
+	return r
 }

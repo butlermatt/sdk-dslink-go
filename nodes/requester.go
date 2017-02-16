@@ -3,6 +3,7 @@ package nodes
 import (
 	"sync"
 	"github.com/butlermatt/dslink"
+	"errors"
 )
 
 const (
@@ -76,8 +77,13 @@ func (r *Requester) GetRemoteNode(path string) (dslink.Node, error) {
 	r.SendRequest(req, rChan)
 
 	resp := <-rChan
-	dslink.Log.Printf("Returned response is: %v", resp)
 
+	// TODO Check resp for errors!
+	if resp.Error != nil {
+		return nil, errors.New("An error was returned")
+	}
+
+	nd := NewRemoteNode(path)
 	for _, u := range resp.Updates {
 		lu, ok := u.([]interface{})
 		if !ok {
@@ -87,10 +93,60 @@ func (r *Requester) GetRemoteNode(path string) (dslink.Node, error) {
 
 		n := lu[0].(string)
 		dslink.Log.Printf("%s: %v", n, lu[1])
+		if n[0] == '$' {
+			nd.SetConfig(dslink.NodeConfig(n), lu[1])
+		} else if n[0] == '@' {
+			nd.SetAttribute(n, lu[1])
+		} else {
+			// Should be children.
+			mp, ok := lu[1].(map[interface{}]interface{})
+			if !ok {
+				dslink.Log.Printf("Can't convert child %q to node map %#v\n", n, lu[1])
+				continue
+			}
+
+			c := NewRemoteFromMap(n, mp)
+			nd.AddChild(c)
+		}
+		if n == "$disconnectedTs" {
+			return nil, errors.New("No such node")
+		}
+		if n == "$is" {
+			isT, _ := lu[1].(string)
+			if isT == "node" {
+				continue
+			}
+
+			req := dslink.NewReq(r.getRid(), dslink.MethodList)
+			req.Path = "/def/profile/" + isT
+			isChan := make(chan *dslink.Response)
+
+			r.SendRequest(req, isChan)
+			resp := <-isChan
+			r.CloseRequest(req.Rid)
+			for _, u := range resp.Updates {
+				up, ok := u.([]interface{})
+				if !ok {
+					dslink.Log.Printf("Unable to convert %#v to slice", u)
+					continue
+				}
+				n, _ := up[0].(string)
+				if n == "$is" {
+					if up[1] == "node" {
+						continue
+					} else {
+						dslink.Log.Printf("$is on Profile is not node: %q\n", up[1])
+					}
+				} else if n[0] == '$' {
+					nd.SetConfig(dslink.NodeConfig(n), up[1])
+				} else if n[0] == '@' {
+					nd.SetAttribute(n, up[1])
+				}
+			}
+		}
 	}
 
-	// TODO Need to send a close as well
 	r.CloseRequest(req.Rid)
 
-	return nil, nil
+	return nd, nil
 }

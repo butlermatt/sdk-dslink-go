@@ -5,10 +5,14 @@ import (
 )
 
 type Node interface {
+	Name() string
+	Attributes() map[string]interface{}
 	GetAttribute(string) (interface{}, bool)
 	SetAttribute(string, interface{})
+	Configs() map[NodeConfig]interface{}
 	GetConfig(NodeConfig) (interface{}, bool)
 	SetConfig(NodeConfig, interface{})
+	Children() map[string]Node
 	AddChild(Node) error
 	RemoveChild(string) Node
 	Remove()
@@ -31,12 +35,6 @@ type Valued interface {
 	Value() interface{}
 	Subscribe(int32)
 	Unsubscribe(int32)
-}
-
-type ValueEditor interface {
-	Valued
-	GetEditor() string
-	SetEditor(string)
 }
 
 //

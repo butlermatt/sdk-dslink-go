@@ -3,17 +3,17 @@ package main
 import (
 	"fmt"
 	//"github.com/butlermatt/dslink"
-	"github.com/butlermatt/dslink/link"
+	"github.com/butlermatt/dslink/conn"
 )
 
 func main() {
-	l := link.NewLink("MyRequester-", link.IsRequester, link.OnConnected(connected))
+	l := conn.NewLink("MyRequester-", conn.IsNotResponder, conn.IsRequester, conn.OnConnected(connected))
 	l.Init()
 
 	l.Start()
 }
 
-func connected(l link.Link) {
+func connected(l *conn.Link) {
 	req := l.GetRequester()
 
 	fmt.Println("In Connected")
@@ -22,5 +22,5 @@ func connected(l link.Link) {
 		fmt.Printf("Error: %v\n", err)
 	}
 
-	fmt.Printf("Got node: %v\n", n)
+	fmt.Printf("Got node: %#v\n", n)
 }

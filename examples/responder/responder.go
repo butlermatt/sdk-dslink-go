@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"time"
 	"github.com/butlermatt/dslink"
-	"github.com/butlermatt/dslink/link"
+	"github.com/butlermatt/dslink/conn"
 	"github.com/butlermatt/dslink/nodes"
 )
 
 func main() {
-	l := link.NewLink("MyTest-", link.OnConnected(connected))
+	l := conn.NewLink("MyTest-", conn.OnConnected(connected))
 	l.Init()
 
 	prov := l.GetProvider()
@@ -61,7 +61,7 @@ func Tester(params map[string]interface{}, ret chan<-[]interface{}) {
 	close(ret)
 }
 
-func connected(l link.Link) {
+func connected(l *conn.Link) {
 	dslink.Log.Println("I'm connected!")
 
 	p := l.GetProvider()
@@ -80,7 +80,7 @@ func connected(l link.Link) {
 
 	dslink.Log.Printf("I'm in here now?\n")
 	j := 0
-	var nn *nodes.SimpleNode
+	var nn *nodes.LocalNode
 	for i := range t.C {
 		j++
 		dslink.Log.Printf("i Is: %v\n", i)

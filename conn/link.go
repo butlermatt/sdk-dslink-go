@@ -31,12 +31,6 @@ func Logger(l *lg.Logger) func(c *Config) {
 	}
 }
 
-func Provider(p dslink.Responder) func(c *Config) {
-	return func(c *Config) {
-		c.responder = p
-	}
-}
-
 func OnConnected(oc ConnectedCB) func(c *Config) {
 	return func(c *Config) {
 		c.oc = oc
@@ -67,7 +61,6 @@ type Config struct {
 	keyPath	    string
 	logFile     string
 	log         bool
-	responder   dslink.Responder
 	oc          ConnectedCB
 }
 
@@ -106,7 +99,7 @@ type ConnectedCB func(*Link)
 type Link struct {
 	conf  Config
 	cl    *httpClient
-	pr    dslink.Responder
+	pr    *nodes.Provider
 	msgs  chan *dslink.Message
 	resp  chan *dslink.Response
 	reqs  chan *dslink.Request
@@ -126,12 +119,7 @@ func (l *Link) Init() {
 
 	if l.conf.isResponder {
 		l.resp = make(chan *dslink.Response)
-		if l.conf.responder != nil {
-			l.pr = l.conf.responder
-			l.conf.responder = nil
-		} else {
-			l.pr = nodes.NewProvider(l.resp)
-		}
+		l.pr = nodes.NewProvider(l.resp)
 	}
 
 	if l.conf.isRequester {
@@ -177,12 +165,8 @@ func (l *Link) Stop() {
 	l.cl.Close()
 }
 
-func (l *Link) GetProvider() dslink.Provider {
-	prov, ok := l.pr.(dslink.Provider)
-	if !ok {
-		return nil
-	}
-	return prov
+func (l *Link) GetProvider() *nodes.Provider {
+	return l.pr
 }
 
 func (l *Link) GetRequester() *nodes.Requester {
