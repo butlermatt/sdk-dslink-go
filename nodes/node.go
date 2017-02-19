@@ -10,14 +10,14 @@ type LocalNode struct {
 	p	    *Provider
 	attr        map[string]interface{}
 	conf        map[dslink.NodeConfig]interface{}
-	Parent      dslink.Node
+	Parent      *LocalNode
 	name        string
 	path        string
 	value       interface{}
 	valType     dslink.ValueType
 	onInvoke    dslink.InvokeFn
 	columns     []map[string]interface{}
-	chld        map[string]dslink.Node
+	chld        map[string]*LocalNode
 	sMu         sync.RWMutex
 	subscribers []int32
 	lMu         sync.RWMutex
@@ -55,7 +55,7 @@ func (n *LocalNode) SetConfig(name dslink.NodeConfig, value interface{}) {
 	n.conf[name] = value
 }
 
-func (n *LocalNode) Children() map[string]dslink.Node {
+func (n *LocalNode) Children() map[string]*LocalNode {
 	return n.chld
 }
 
@@ -164,11 +164,7 @@ func (n *LocalNode) List(request *dslink.Request) *dslink.Response {
 	}
 
 	for name, nd := range n.chld {
-		m, ok := nd.(dslink.Mapper)
-		if !ok {
-			continue
-		}
-		r.AddUpdate(name, m.ToMap())
+		r.AddUpdate(name, nd.ToMap())
 	}
 
 	return r
@@ -409,7 +405,7 @@ func NewNode(name string, provider *Provider) *LocalNode {
 		p:    provider,
 		attr: make(map[string]interface{}),
 		conf: make(map[dslink.NodeConfig]interface{}),
-		chld: make(map[string]dslink.Node),
+		chld: make(map[string]*LocalNode),
 		sMu: sync.RWMutex{},
 		lMu: sync.RWMutex{},
 	}

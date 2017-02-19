@@ -8,16 +8,21 @@ import (
 
 type RemoteNode struct {
 	name string
+	path string
 	aMu  sync.RWMutex
 	attr map[string]interface{}
 	cMu  sync.RWMutex
 	conf map[dslink.NodeConfig]interface{}
 	cdMu sync.RWMutex
-	chdn map[string]dslink.Node
+	chdn map[string]*RemoteNode
 }
 
 func (n *RemoteNode) Name() string {
 	return n.name
+}
+
+func (n *RemoteNode) Path() string {
+	return n.path
 }
 
 func (n *RemoteNode) Attributes() map[string]interface{} {
@@ -57,7 +62,7 @@ func (n *RemoteNode) SetConfig(c dslink.NodeConfig, v interface{}) {
 	n.conf[c] = v
 }
 
-func (n *RemoteNode) Children() map[string]dslink.Node {
+func (n *RemoteNode) Children() map[string]*RemoteNode {
 	return n.chdn
 }
 
@@ -75,7 +80,7 @@ func (n *RemoteNode) AddChild(node dslink.Node) error {
 	return nil
 }
 
-func (n *RemoteNode) RemoveChild(p string) dslink.Node {
+func (n *RemoteNode) RemoveChild(p string) *RemoteNode {
 	n.cdMu.Lock()
 	defer n.cdMu.Unlock()
 
@@ -89,7 +94,7 @@ func (n *RemoteNode) Remove() {
 	// TODO Not supported? Or send request to remote to execute it?
 }
 
-func (n *RemoteNode) GetChild(p string) dslink.Node {
+func (n *RemoteNode) GetChild(p string) *RemoteNode {
 	n.cdMu.RLock()
 	defer n.cdMu.RUnlock()
 
@@ -99,15 +104,23 @@ func (n *RemoteNode) GetChild(p string) dslink.Node {
 func NewRemoteNode(p string) *RemoteNode {
 	r := &RemoteNode{
 		name: PathName(p),
+		path: p,
 		conf: make(map[dslink.NodeConfig]interface{}),
 		attr: make(map[string]interface{}),
-		chdn: make(map[string]dslink.Node),
+		chdn: make(map[string]*RemoteNode),
 	}
 	return r
 }
 
-func NewRemoteFromMap(n string, m map[interface{}]interface{}) *RemoteNode {
+func NewRemoteFromMap(n, p string, m map[interface{}]interface{}) *RemoteNode {
 	r := NewRemoteNode(n)
+	var pa string
+	if p == "/" || (len(p) > 1 && p[len(p) - 1] == '/') {
+		pa = p + n
+	} else {
+		pa = p + "/" + n
+	}
+	r.path = pa
 	for k, v := range m {
 		nm, _ := k.(string)
 		switch nm[0] {

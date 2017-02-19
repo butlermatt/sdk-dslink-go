@@ -49,8 +49,8 @@ func (r *Requester) CloseRequest(rid int32) {
 }
 
 func (r *Requester) deleteRid(rid int32) {
-	close(r.cache[rid])
 	r.cMu.Lock()
+	close(r.cache[rid])
 	defer r.cMu.Unlock()
 	delete(r.cache, rid)
 }
@@ -67,9 +67,7 @@ func (r *Requester) getRid() int32 {
 	return r.rid
 }
 
-func (r *Requester) GetRemoteNode(path string) (dslink.Node, error) {
-	// TODO Should have remoteNode type?
-	dslink.Log.Println("In GetRemoteNode")
+func (r *Requester) GetRemoteNode(path string) (*RemoteNode, error) {
 	req := dslink.NewReq(r.getRid(), dslink.MethodList)
 	rChan := make(chan *dslink.Response)
 	req.Path = path
@@ -105,7 +103,7 @@ func (r *Requester) GetRemoteNode(path string) (dslink.Node, error) {
 				continue
 			}
 
-			c := NewRemoteFromMap(n, mp)
+			c := NewRemoteFromMap(n, path, mp)
 			nd.AddChild(c)
 		}
 		if n == "$disconnectedTs" {

@@ -12,11 +12,11 @@ type Node interface {
 	Configs() map[NodeConfig]interface{}
 	GetConfig(NodeConfig) (interface{}, bool)
 	SetConfig(NodeConfig, interface{})
-	Children() map[string]Node
-	AddChild(Node) error
-	RemoveChild(string) Node
-	Remove()
-	GetChild(string) Node
+	//Children() map[string]Node
+	//AddChild(Node) error
+	//RemoveChild(string) Node
+	//Remove()
+	//GetChild(string) Node
 }
 
 type Mapper interface {
