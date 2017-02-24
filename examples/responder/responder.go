@@ -70,11 +70,6 @@ func connected(l *conn.Link) {
 		dslink.Log.Println("Node was missing!?")
 		return
 	}
-	node, ok := nd.(dslink.Valued)
-	if !ok {
-		dslink.Log.Println("Couldn't make it a valued")
-		return
-	}
 
 	t := time.NewTicker(time.Second * 2)
 
@@ -84,7 +79,7 @@ func connected(l *conn.Link) {
 	for i := range t.C {
 		j++
 		dslink.Log.Printf("i Is: %v\n", i)
-		node.UpdateValue(fmt.Sprintf("I'm now %d", j))
+		nd.UpdateValue(fmt.Sprintf("I'm now %d", j))
 		if j >= 10 {
 			t.Stop()
 			p.RemoveNode("/TestValue/Matthew")

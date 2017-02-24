@@ -6,7 +6,7 @@ import (
 )
 
 type Provider struct {
-	root        dslink.Node
+	root        *LocalNode
 	c           chan<- *dslink.Response
 	lMu         sync.Mutex
 	listResp    map[int32]dslink.Lister
@@ -17,7 +17,7 @@ type Provider struct {
 }
 
 // GetNode will attempt to return the Node located at the Specified path.
-func (s *Provider) GetNode(path string) dslink.Node {
+func (s *Provider) GetNode(path string) *LocalNode {
 	s.cMu.RLock()
 	defer s.cMu.RUnlock()
 	nd := s.cache[path]
@@ -25,7 +25,7 @@ func (s *Provider) GetNode(path string) dslink.Node {
 }
 
 // GetRoot returns the root node of this DSLink when run as a Responder.
-func (s *Provider) GetRoot() dslink.Node {
+func (s *Provider) GetRoot() *LocalNode {
 	return s.root
 }
 
@@ -40,7 +40,7 @@ func (s *Provider) AddNode(path string, node *LocalNode) {
 // RemoveNode will remove the node at the specified path. It will return the node which was removed. It will
 // also attempt to call Remove on the Node itself to ensure the parent/child associations are cleaned up as
 // well.
-func (s *Provider) RemoveNode(path string) dslink.Node {
+func (s *Provider) RemoveNode(path string) *LocalNode {
 	s.cMu.Lock()
 	nd := s.cache[path]
 	delete(s.cache, path)
