@@ -101,6 +101,19 @@ func (n *RemoteNode) GetChild(p string) *RemoteNode {
 	return n.chdn[p]
 }
 
+func (n *RemoteNode) Type() dslink.ValueType {
+	t := n.conf[dslink.ConfigType]
+	dslink.Log.Printf("t is: %q\n", t)
+	if t == nil {
+		return ""
+	}
+	vt, ok := t.(string)
+	if !ok {
+		return ""
+	}
+	return dslink.ValueType(vt)
+}
+
 func NewRemoteNode(p string) *RemoteNode {
 	r := &RemoteNode{
 		name: PathName(p),

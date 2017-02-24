@@ -23,6 +23,7 @@ func NewRequester(reqChan chan<-*dslink.Request) *Requester {
 }
 
 func (r *Requester) HandleResponse(resp *dslink.Response) {
+	dslink.Log.Printf("Received respond with RID: %d", resp.Rid)
 	r.cMu.RLock()
 	c := r.cache[resp.Rid]
 	r.cMu.RUnlock()
@@ -39,7 +40,6 @@ func (r *Requester) SendRequest(req *dslink.Request, c chan *dslink.Response) {
 	r.cMu.Unlock()
 
 	r.c <- req
-	dslink.Log.Println("Sent request")
 }
 
 func (r *Requester) CloseRequest(rid int32) {
@@ -62,7 +62,7 @@ func (r *Requester) getRid() int32 {
 	if r.rid == int32(MaxInt32) {
 		r.rid = 0
 	}
-	r.rid += 1
+	r.rid += 1 // Should never have rid=0
 
 	return r.rid
 }
@@ -90,7 +90,10 @@ func (r *Requester) GetRemoteNode(path string) (*RemoteNode, error) {
 		}
 
 		n := lu[0].(string)
-		dslink.Log.Printf("%s: %v", n, lu[1])
+		if n == "$disconnectedTs" {
+			return nil, errors.New("No such node")
+		}
+
 		if n[0] == '$' {
 			nd.SetConfig(dslink.NodeConfig(n), lu[1])
 		} else if n[0] == '@' {
@@ -106,9 +109,9 @@ func (r *Requester) GetRemoteNode(path string) (*RemoteNode, error) {
 			c := NewRemoteFromMap(n, path, mp)
 			nd.AddChild(c)
 		}
-		if n == "$disconnectedTs" {
-			return nil, errors.New("No such node")
-		}
+
+		// TODO: This is not a clean way of handling these. Need to find another way to get the profile and
+		// add it to the existing node data without causing blocks or locks.
 		if n == "$is" {
 			isT, _ := lu[1].(string)
 			if isT == "node" {

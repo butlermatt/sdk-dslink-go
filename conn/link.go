@@ -37,17 +37,6 @@ func OnConnected(oc ConnectedCB) func(c *Config) {
 	}
 }
 
-//type Link interface {
-//	// Init will initialize the Link and setup the various configurations required for the Link. This includes
-//	// loading the dslink.json and nodes.json files, if available, to populate the nodes.
-//	Init()
-//	// Start will start the Link to establish connection to the broker.
-//	Start()
-//	Stop()
-//	GetProvider() dslink.Provider
-//	GetRequester() *nodes.Requester
-//}
-
 // TODO: Provide some kind of config option for logger and logger level
 type Config struct {
 	isResponder bool
@@ -80,7 +69,7 @@ func NewLink(prefix string, options ...func(*Config)) *Link {
 
 	if l.conf.log {
 		if dslink.Log == nil {
-			dslink.Log = lg.New(os.Stdout, "[DSA] ",0 /*lg.Lshortfile*/)
+			dslink.Log = lg.New(os.Stdout, "[DSA] ", 0 /*lg.Lshortfile*/)
 		}
 	} else if dslink.Log == nil {
 		dslink.Log = lg.New(ioutil.Discard, "[DSA] ", lg.Lshortfile)

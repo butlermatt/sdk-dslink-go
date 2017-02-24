@@ -36,6 +36,7 @@ func printNode(n *nodes.RemoteNode) {
 	fmt.Println("Got Node")
 	fmt.Printf("\tPath: %s\n", n.Path())
 	fmt.Printf("\tName: %s\n", n.Name())
+	fmt.Printf("\tType: %s\n", n.Type())
 	fmt.Println("\tAttributes:")
 	for k, v := range n.Attributes() {
 		fmt.Printf("\t\t%q: %v\n", k, v)
