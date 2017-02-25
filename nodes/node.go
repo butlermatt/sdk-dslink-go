@@ -2,8 +2,9 @@ package nodes
 
 import (
 	"errors"
-	"github.com/butlermatt/dslink"
 	"sync"
+	"github.com/butlermatt/dslink"
+	"github.com/butlermatt/dslink/log"
 )
 
 type LocalNode struct {
@@ -184,7 +185,7 @@ func (n *LocalNode) Close(request *dslink.Request) {
 	if i != -1 {
 		n.listSubs[i] = n.listSubs[len(n.listSubs) - 1]
 		n.listSubs = n.listSubs[:len(n.listSubs) - 1]
-		dslink.Log.Printf("Closed conn for Rid: %d\n", request.Rid)
+		log.Debug.Printf("Closed conn for Rid: %d\n", request.Rid)
 	}
 }
 

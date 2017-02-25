@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 	"github.com/butlermatt/dslink"
+	"github.com/butlermatt/dslink/log"
 	"github.com/butlermatt/dslink/conn"
 	"github.com/butlermatt/dslink/nodes"
 )
@@ -40,7 +41,7 @@ func main() {
 	n.SetType(dslink.ValueString)
 	n.UpdateValue("Hello World")
 	n.EnableSet(dslink.PermWrite, func(n dslink.Node, v interface{}) bool {
-		dslink.Log.Printf("Going to set value: %v", v)
+		log.Printf("Going to set value: %v", v)
 		return true
 	})
 	root.AddChild(n)
@@ -54,31 +55,31 @@ func main() {
 }
 
 func Tester(params map[string]interface{}, ret chan<-[]interface{}) {
-	dslink.Log.Println("I'm in the invoke!")
+	log.Println("I'm in the invoke!")
 
-	dslink.Log.Printf("Got params: %v\n", params)
+	log.Printf("Got params: %v\n", params)
 	ret <- []interface{}{true, "Success!"}
 	close(ret)
 }
 
 func connected(l *conn.Link) {
-	dslink.Log.Println("I'm connected!")
+	log.Info.Println("I'm connected!")
 
 	p := l.GetProvider()
 	nd := p.GetNode("/TestValue")
 	if nd == nil {
-		dslink.Log.Println("Node was missing!?")
+		log.Println("Node was missing!?")
 		return
 	}
 
 	t := time.NewTicker(time.Second * 2)
 
-	dslink.Log.Printf("I'm in here now?\n")
+	log.Printf("I'm in here now?\n")
 	j := 0
 	var nn *nodes.LocalNode
 	for i := range t.C {
 		j++
-		dslink.Log.Printf("i Is: %v\n", i)
+		log.Printf("i Is: %v\n", i)
 		nd.UpdateValue(fmt.Sprintf("I'm now %d", j))
 		if j >= 10 {
 			t.Stop()

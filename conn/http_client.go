@@ -14,6 +14,7 @@ import (
 import (
 	"bytes"
 	"github.com/butlermatt/dslink"
+	"github.com/butlermatt/dslink/log"
 	"github.com/butlermatt/dslink/crypto"
 	"github.com/gorilla/websocket"
 	"gopkg.in/vmihailenco/msgpack.v2"
@@ -195,7 +196,7 @@ func (c *httpClient) handleConnections() {
 			_, p, err := c.wsClient.ReadMessage()
 			if err != nil {
 				//TODO: Better logging/handling here
-				log.Printf("Read error! %v\n", err)
+				log.Error.Printf("Read error! %v\n", err)
 				return
 			}
 			c.in <- p
@@ -209,7 +210,7 @@ func (c *httpClient) handleConnections() {
 			msg := &dslink.Message{Msg: -1, Ack: -1}
 			err := c.unmarshal(s, msg)
 			if err != nil {
-				log.Printf("Error unmarshalling %s\nError: %v\n", s, err)
+				log.Error.Printf("Error unmarshalling %s\nError: %v\n", s, err)
 			}
 			log.Printf("Recv: %v", msg)
 			c.msgs <- msg
@@ -221,7 +222,7 @@ func (c *httpClient) handleConnections() {
 			m.Msg = c.msgId
 			t, s, err := c.marshal(*m)
 			if err != nil {
-				log.Printf("Error marshalling %+v\nError: %+v\n", *m, err)
+				log.Error.Printf("Error marshalling %+v\nError: %+v\n", *m, err)
 				continue
 			}
 			log.Printf("Sent: %v\n", m)

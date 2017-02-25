@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"github.com/butlermatt/dslink/log"
 )
 
 const brokerDefault = "http://127.0.0.1:8080/conn"
@@ -70,5 +71,9 @@ func parseFlags(c *Config) {
 	c.token = token
 	c.rootPath = basePath
 	c.logFile = logFile
-	c.log = logL
+	if (logL) {
+		c.logLevel = log.DebugLevel
+	} else {
+		c.logLevel = log.DisabledLevel
+	}
 }

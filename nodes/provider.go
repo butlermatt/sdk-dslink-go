@@ -3,6 +3,7 @@ package nodes
 import (
 	"sync"
 	"github.com/butlermatt/dslink"
+	"github.com/butlermatt/dslink/log"
 )
 
 type Provider struct {
@@ -76,7 +77,7 @@ func (s *Provider) HandleRequest(req *dslink.Request) *dslink.Response {
 	case dslink.MethodSet:
 		s.handleSet(req)
 	default:
-		dslink.Log.Printf("Unhandled method: %s", req.Method)
+		log.Debug.Printf("Unhandled method: %s", req.Method)
 	}
 	return nil
 }

@@ -2,8 +2,9 @@ package nodes
 
 import (
 	"sync"
-	"github.com/butlermatt/dslink"
 	"errors"
+	"github.com/butlermatt/dslink"
+	"github.com/butlermatt/dslink/log"
 )
 
 const (
@@ -23,7 +24,7 @@ func NewRequester(reqChan chan<-*dslink.Request) *Requester {
 }
 
 func (r *Requester) HandleResponse(resp *dslink.Response) {
-	dslink.Log.Printf("Received respond with RID: %d", resp.Rid)
+	log.Debug.Printf("Received respond with RID: %d", resp.Rid)
 	r.cMu.RLock()
 	c := r.cache[resp.Rid]
 	r.cMu.RUnlock()
@@ -85,7 +86,7 @@ func (r *Requester) GetRemoteNode(path string) (*RemoteNode, error) {
 	for _, u := range resp.Updates {
 		lu, ok := u.([]interface{})
 		if !ok {
-			dslink.Log.Println("Update isn't a list")
+			log.Debug.Println("Update isn't a list")
 			continue
 		}
 
@@ -102,7 +103,7 @@ func (r *Requester) GetRemoteNode(path string) (*RemoteNode, error) {
 			// Should be children.
 			mp, ok := lu[1].(map[interface{}]interface{})
 			if !ok {
-				dslink.Log.Printf("Can't convert child %q to node map %#v\n", n, lu[1])
+				log.Warn.Printf("Can't convert child %q to node map %#v\n", n, lu[1])
 				continue
 			}
 
@@ -128,7 +129,7 @@ func (r *Requester) GetRemoteNode(path string) (*RemoteNode, error) {
 			for _, u := range resp.Updates {
 				up, ok := u.([]interface{})
 				if !ok {
-					dslink.Log.Printf("Unable to convert %#v to slice", u)
+					log.Warn.Printf("Unable to convert %#v to slice", u)
 					continue
 				}
 				n, _ := up[0].(string)
@@ -136,7 +137,7 @@ func (r *Requester) GetRemoteNode(path string) (*RemoteNode, error) {
 					if up[1] == "node" {
 						continue
 					} else {
-						dslink.Log.Printf("$is on Profile is not node: %q\n", up[1])
+						log.Warn.Printf("$is on Profile is not node: %q\n", up[1])
 					}
 				} else if n[0] == '$' {
 					nd.SetConfig(dslink.NodeConfig(n), up[1])

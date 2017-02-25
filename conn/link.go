@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
-	lg "log"
 	"github.com/butlermatt/dslink"
+	"github.com/butlermatt/dslink/log"
 	"github.com/butlermatt/dslink/nodes"
 )
 
@@ -23,11 +23,9 @@ func AutoInit(c *Config) {
 	c.autoInit = true
 }
 
-var log *lg.Logger
-
-func Logger(l *lg.Logger) func(c *Config) {
+func LogLevel(l log.Level) func(c *Config) {
 	return func(c *Config) {
-		dslink.Log = l
+		c.logLevel = l
 	}
 }
 
@@ -49,7 +47,7 @@ type Config struct {
 	rootPath    string
 	keyPath	    string
 	logFile     string
-	log         bool
+	logLevel    log.Level
 	oc          ConnectedCB
 }
 
@@ -67,14 +65,13 @@ func NewLink(prefix string, options ...func(*Config)) *Link {
 	// Handle Flags
 	parseFlags(&l.conf)
 
-	if l.conf.log {
-		if dslink.Log == nil {
-			dslink.Log = lg.New(os.Stdout, "[DSA] ", 0 /*lg.Lshortfile*/)
-		}
-	} else if dslink.Log == nil {
-		dslink.Log = lg.New(ioutil.Discard, "[DSA] ", lg.Lshortfile)
+	if l.conf.logLevel == log.DisabledLevel {
+		log.SetLevel(log.DisabledLevel)
+		log.SetOutput(nil)
+
+	} else {
+		log.SetLevel(l.conf.logLevel)
 	}
-	log = dslink.Log
 
 	if l.conf.autoInit {
 		l.Init()
@@ -175,7 +172,7 @@ func (l *Link) handleMessage(m *dslink.Message) {
 			l.reqer.HandleResponse(resp)
 		}
 	} else if len(m.Resp) > 0 {
-		log.Println("Received responses when no requester active.")
+		log.Debug.Println("Received responses when no requester active.")
 	}
 
 	ackM = &dslink.Message{Ack: m.Msg}
@@ -205,20 +202,20 @@ func (l *Link) loadDsJson() {
 	if l.conf.rootPath != "" {
 		err := os.Chdir(l.conf.rootPath)
 		if err != nil {
-			log.Printf("Unable to load %s, cannot find root path: %s\n", dslinkJson, l.conf.rootPath)
+			log.Warn.Printf("Unable to load %s, cannot find root path: %s\n", dslinkJson, l.conf.rootPath)
 			return
 		}
 	}
 	d, err := ioutil.ReadFile(dslinkJson)
 	if err != nil {
-		log.Printf("Unable to open file: %s\nError: %v", dslinkJson, err)
+		log.Error.Printf("Unable to open file: %s\nError: %v", dslinkJson, err)
 		return
 	}
 
 	ds := &dsJson{}
 	err = json.Unmarshal(d, ds)
 	if err != nil {
-		log.Printf("Unable to Unmarshal data: %s\nError:%v\n", d, err)
+		log.Error.Printf("Unable to Unmarshal data: %s\nError:%v\n", d, err)
 		return
 	}
 

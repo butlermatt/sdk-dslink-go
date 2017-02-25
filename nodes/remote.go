@@ -2,8 +2,9 @@ package nodes
 
 import (
 	"sync"
-	"github.com/butlermatt/dslink"
 	"errors"
+	"github.com/butlermatt/dslink"
+	//"github.com/butlermatt/dslink/log"
 )
 
 type RemoteNode struct {
@@ -103,7 +104,6 @@ func (n *RemoteNode) GetChild(p string) *RemoteNode {
 
 func (n *RemoteNode) Type() dslink.ValueType {
 	t := n.conf[dslink.ConfigType]
-	dslink.Log.Printf("t is: %q\n", t)
 	if t == nil {
 		return ""
 	}

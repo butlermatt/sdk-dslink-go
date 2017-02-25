@@ -1,10 +1,5 @@
 package dslink
 
-import (
-	lg "log"
-)
-
-var Log *lg.Logger
 //
 //type Provider interface {
 //	// TODO
