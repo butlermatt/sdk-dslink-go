@@ -30,7 +30,7 @@ func init() {
 		tokenUsage  = "Authorization `Token`"
 		baseUsage   = "Root `path` of the DSLink"
 		logfUsage   = "Output file for logger"
-		loglUsage   = "Enable the default logger"
+		loglUsage   = "Set the log level. Valid values are: debug, info, warn, error, disable. Default is disable"
 	)
 
 	flag.Usage = func() {
