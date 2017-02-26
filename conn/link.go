@@ -11,32 +11,50 @@ import (
 
 const dslinkJson = "dslink.json"
 
-func IsRequester(c *Config) {
+// Optional configuration functions which can be passed to NewLink
+
+// IsRequester is an option for NewLink. It specifies that the link
+// should also include requester functionality. By default requester
+// is disabled.
+func IsRequester(c *config) {
 	c.isRequester = true
 }
 
-func IsNotResponder(c *Config) {
+// IsNotResponder is an option for NewLink. It will disable the
+// Responder functionality of the link. By default responder
+// is always enabled.
+func IsNotResponder(c *config) {
 	c.isResponder = false
 }
 
-func AutoInit(c *Config) {
+// AutoInit is an option for NewLink. This will indicate that
+// the link should automatically try to call the Init method
+// during the NewLink call. By default you must manually call
+// the Init method on the Link.
+func AutoInit(c *config) {
 	c.autoInit = true
 }
 
-func LogLevel(l log.Level) func(c *Config) {
-	return func(c *Config) {
+// LogLevel is an option for NewLink. It accepts a Level from
+// log. This indicates what level logging should be enabled.
+// By default LogLevel is set to DisabledLevel
+func LogLevel(l log.Level) func(c *config) {
+	return func(c *config) {
 		c.logLevel = l
 	}
 }
 
-func OnConnected(oc ConnectedCB) func(c *Config) {
-	return func(c *Config) {
+// OnConnected is an option for NewLink. It accepts a callback
+// with the signature of ConnectedCB. If supplied this will be
+// called once the Link has successfully connected to an upstream
+// broker.
+func OnConnected(oc ConnectedCB) func(c *config) {
+	return func(c *config) {
 		c.oc = oc
 	}
 }
 
-// TODO: Provide some kind of config option for logger and logger level
-type Config struct {
+type config struct {
 	isResponder bool
 	isRequester bool
 	autoInit    bool
@@ -51,11 +69,17 @@ type Config struct {
 	oc          ConnectedCB
 }
 
-func NewLink(prefix string, options ...func(*Config)) *Link {
+// NewLink will create a new Link. The prefix is a require string which
+// identifies this link with the upstream broker. The prefix should end
+// with a hyphen (-) character. You may specify a variable number of
+// configuration methods to help configure the link
+func NewLink(prefix string, options ...func(*config)) *Link {
 	var l Link
 
-	// Handle Options passed
+	// Set default options
 	l.conf.isResponder = true
+	l.conf.logLevel = log.DisabledLevel
+	// Handle Options passed
 	for _, option := range options {
 		option(&l.conf)
 	}
@@ -73,6 +97,10 @@ func NewLink(prefix string, options ...func(*Config)) *Link {
 		log.SetLevel(l.conf.logLevel)
 	}
 
+	if l.conf.logFile != "" {
+		//TODO: Deal with log files right.
+	}
+
 	if l.conf.autoInit {
 		l.Init()
 	}
@@ -83,7 +111,7 @@ func NewLink(prefix string, options ...func(*Config)) *Link {
 type ConnectedCB func(*Link)
 
 type Link struct {
-	conf  Config
+	conf  config
 	cl    *httpClient
 	pr    *nodes.Provider
 	msgs  chan *dslink.Message
@@ -208,7 +236,7 @@ func (l *Link) loadDsJson() {
 	}
 	d, err := ioutil.ReadFile(dslinkJson)
 	if err != nil {
-		log.Error.Printf("Unable to open file: %s\nError: %v", dslinkJson, err)
+		log.Error.Printf("%v", dslinkJson, err)
 		return
 	}
 

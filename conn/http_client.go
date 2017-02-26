@@ -1,6 +1,7 @@
 package conn
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 )
 
 import (
-	"bytes"
 	"github.com/butlermatt/dslink"
 	"github.com/butlermatt/dslink/log"
 	"github.com/butlermatt/dslink/crypto"
@@ -243,7 +243,7 @@ func (c *httpClient) handleConnections() {
 
 // Dial will attempt to connect a Link with the specified prefix to the specified address.
 // Returns an error if connection handshake fails. Otherwise returns the connected httpClient.
-func dial(conf *Config, msgs chan *dslink.Message) (*httpClient, error) {
+func dial(conf *config, msgs chan *dslink.Message) (*httpClient, error) {
 	u, err := url.Parse(conf.broker)
 	if err != nil {
 		return nil, err

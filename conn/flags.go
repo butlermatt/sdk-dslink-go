@@ -17,7 +17,7 @@ var (
 	token      string
 	basePath   string
 	logFile    string
-	logL       bool
+	logL       string
 	help       bool
 )
 
@@ -41,7 +41,7 @@ func init() {
 
 	flag.BoolVar(&help, "h", false, helpUsage)
 	flag.BoolVar(&help, "help", false, helpUsage)
-	flag.BoolVar(&logL, "log", false, loglUsage)
+	flag.StringVar(&logL, "log", "", loglUsage)
 	flag.StringVar(&brokerAddr, "broker", brokerDefault, brokerUsage)
 	flag.StringVar(&brokerAddr, "b", brokerDefault, brokerUsage)
 	flag.StringVar(&linkName, "name", "", nameUsage)
@@ -52,7 +52,7 @@ func init() {
 	flag.StringVar(&logFile, "logfile", "", logfUsage)
 }
 
-func parseFlags(c *Config) {
+func parseFlags(c *config) {
 	flag.Parse()
 
 	if help {
@@ -71,9 +71,13 @@ func parseFlags(c *Config) {
 	c.token = token
 	c.rootPath = basePath
 	c.logFile = logFile
-	if (logL) {
+	if logL == "" {
 		c.logLevel = log.DebugLevel
 	} else {
-		c.logLevel = log.DisabledLevel
+		ll, err := log.ToLevel(logL)
+		c.logLevel = ll
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Unknown log level: %q Logging is disabled\n", logL)
+		}
 	}
 }
