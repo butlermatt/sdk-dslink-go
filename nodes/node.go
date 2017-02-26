@@ -14,6 +14,7 @@ type LocalNode struct {
 	Parent      *LocalNode
 	name        string
 	path        string
+	vMu         sync.RWMutex
 	value       interface{}
 	valType     dslink.ValueType
 	onInvoke    dslink.InvokeFn
@@ -275,13 +276,17 @@ func (n *LocalNode) AddAction(fn dslink.InvokeFn, params []dslink.Params, cols [
 }
 
 func (n *LocalNode) UpdateValue(v interface{}) {
+	n.vMu.Lock()
 	n.value = v
+	n.vMu.Unlock()
 	// TODO: Something about the subscription and stuff
 	val := dslink.NewValueUpdate(v)
 	n.notifySubs(val)
 }
 
 func (n *LocalNode) Value() interface{} {
+	n.vMu.RLock()
+	defer n.vMu.RUnlock()
 	return n.value
 }
 

@@ -138,13 +138,11 @@ func ToLevel(s string) (Level, error) {
 		return DebugLevel, nil
 	case "info":
 		return InfoLevel, nil
-	case "warn":
-	case "warning":
+	case "warn", "warning":
 		return WarningLevel, nil
 	case "error":
 		return ErrorLevel, nil
-	case "disable":
-	case "disabled":
+	case "disable", "disabled":
 		return DisabledLevel, nil
 	}
 	return DisabledLevel, fmt.Errorf("invalid log level %q", s)
