@@ -235,8 +235,11 @@ func (l *Link) loadDsJson() {
 		}
 	}
 	d, err := ioutil.ReadFile(dslinkJson)
-	if err != nil {
-		log.Error.Printf("%v", dslinkJson, err)
+	if err != nil && os.IsNotExist(err) {
+		log.Warn.Printf("Unable to find file: %q", dslinkJson)
+		return
+	} else if err != nil {
+		log.Error.Printf("Unexpected error: %v", err)
 		return
 	}
 

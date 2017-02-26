@@ -1,7 +1,6 @@
 package conn
 
 import (
-	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -30,14 +29,6 @@ const (
 	fmtMsgP
 )
 
-type encode interface {
-	Encode(interface{}) error
-}
-
-type decode interface {
-	Decode(interface{}) error
-}
-
 type dsResp struct {
 	Id        string `json:"id"`
 	PublicKey string `json:"publicKey"`
@@ -53,13 +44,8 @@ type dsResp struct {
 }
 
 type httpClient struct {
-	enc       encode
-	dec       decode
-	encBuf    bytes.Buffer
-	decBuf    bytes.Buffer
 	dsId      string
 	msgId     int32
-	reqId     uint32
 	keyMaker  crypto.ECDH
 	htClient  *http.Client
 	rawUrl    *url.URL
