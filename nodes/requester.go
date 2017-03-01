@@ -24,7 +24,7 @@ func NewRequester(reqChan chan<-*dslink.Request) *Requester {
 }
 
 func (r *Requester) HandleResponse(resp *dslink.Response) {
-	log.Debug.Printf("Received respond with RID: %d", resp.Rid)
+	log.Debug.Printf("Received response with RID: %d", resp.Rid)
 	r.cMu.RLock()
 	c := r.cache[resp.Rid]
 	r.cMu.RUnlock()
@@ -51,8 +51,8 @@ func (r *Requester) CloseRequest(rid int32) {
 
 func (r *Requester) deleteRid(rid int32) {
 	r.cMu.Lock()
-	close(r.cache[rid])
 	defer r.cMu.Unlock()
+	close(r.cache[rid])
 	delete(r.cache, rid)
 }
 
@@ -66,6 +66,33 @@ func (r *Requester) getRid() int32 {
 	r.rid += 1 // Should never have rid=0
 
 	return r.rid
+}
+
+// List will add a list subscription to the node at the specified path. Updates will be provided to the specified
+// data channel as a slice of interface{}. This method returns an int32 which is the Rid of the List request.
+// When you are done receiving data for this List request, you should call CloseRequest with the provided Rid.
+func (r *Requester) List(path string, data chan<-[]interface{}) int32 {
+	req := dslink.NewReq(r.getRid(), dslink.MethodList)
+	rChan := make(chan *dslink.Response)
+	req.Path = path
+
+	r.SendRequest(req, rChan)
+
+	go func(respChan <-chan *dslink.Response, data chan<-[]interface{}) {
+		for resp := range respChan {
+			for _, u := range resp.Updates {
+				lu, ok := u.([]interface{})
+				if !ok {
+					log.Warn.Printf("Update value unexpected type. %v is a %T", u, u)
+					continue
+				}
+				data<- lu
+			}
+		}
+		close(data)
+	}(rChan, data)
+
+	return req.Rid
 }
 
 func (r *Requester) GetRemoteNode(path string) (*RemoteNode, error) {

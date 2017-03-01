@@ -5,6 +5,7 @@ import (
 	//"github.com/butlermatt/dslink"
 	"github.com/butlermatt/dslink/conn"
 	"github.com/butlermatt/dslink/nodes"
+	"time"
 )
 
 func main() {
@@ -25,11 +26,35 @@ func test(path string, req *nodes.Requester) {
 	n, err := req.GetRemoteNode(path)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
+	} else {
+		printNode(n)
+		for _, k := range n.Children() {
+			go test(k.Path(), req)
+		}
 	}
-	printNode(n)
-	for _, k := range n.Children() {
-		go test(k.Path(), req)
+
+	tl := time.After(time.Second * 5)
+	uChan := make(chan []interface{})
+	rid := req.List("/downstream/Example", uChan)
+	for {
+		select {
+		case up, ok := <-uChan:
+			if !ok {
+				uChan = nil
+			} else {
+				fmt.Printf("Update contains %d items\n", len(up))
+				for i, u := range up {
+					fmt.Printf("\t%d: %v\n", i, u)
+				}
+			}
+		case <-tl:
+			req.CloseRequest(rid)
+		}
+		if uChan == nil {
+			break
+		}
 	}
+	fmt.Println("Done")
 }
 
 func printNode(n *nodes.RemoteNode) {
