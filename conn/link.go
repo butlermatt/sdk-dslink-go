@@ -206,6 +206,7 @@ func (l *Link) handleMessage(m *dslink.Message) {
 	ackM = &dslink.Message{Ack: m.Msg}
 	if m.Salt != "" {
 		l.salt = m.Salt
+		// TODO: Handle actually using the reconnect salt (if the websocket ever drops)
 		if !l.init {
 			l.init = true
 			if l.conf.oc != nil {

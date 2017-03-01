@@ -8,7 +8,7 @@ import (
 )
 
 type LocalNode struct {
-	p	    *Provider
+	provider    *Provider
 	attr        map[string]interface{}
 	conf        map[dslink.NodeConfig]interface{}
 	Parent      *LocalNode
@@ -72,7 +72,7 @@ func (n *LocalNode) AddChild(node dslink.Node) error {
 	}
 	sn.Parent = n
 	sn.path = n.path + "/" + sn.name
-	n.p.AddNode(sn.path, sn)
+	n.provider.AddNode(sn.path, sn)
 	n.chld[sn.name] = sn
 
 	n.notifyList(sn.name, sn.ToMap())
@@ -93,8 +93,8 @@ func (n *LocalNode) Remove() {
 		delete(n.chld, name)
 	}
 
-	prov := n.p
-	n.p = nil
+	prov := n.provider
+	n.provider = nil
 	if prov != nil {
 		prov.RemoveNode(n.path)
 	}
@@ -111,7 +111,7 @@ func (n *LocalNode) RemoveChild(name string) dslink.Node {
 		for _, i := range n.listSubs {
 			r := dslink.NewResp(i)
 			r.Updates = append(r.Updates, map[string]string{"name": name, "change": "remove"})
-			n.p.SendResponse(r)
+			n.provider.SendResponse(r)
 		}
 	}
 
@@ -124,7 +124,7 @@ func (n *LocalNode) notifyList(name string, value interface{}) {
 	for _, i := range n.listSubs {
 		r := &dslink.Response{Rid: i}
 		r.AddUpdate(name, value)
-		n.p.SendResponse(r)
+		n.provider.SendResponse(r)
 	}
 }
 
@@ -140,7 +140,7 @@ func (n *LocalNode) notifySubs(update *dslink.ValueUpdate) {
 	for _, i := range n.subscribers {
 		r.AddUpdate(i, update)
 	}
-	n.p.SendResponse(r)
+	n.provider.SendResponse(r)
 }
 
 func (n *LocalNode) List(request *dslink.Request) *dslink.Response {
@@ -302,14 +302,14 @@ func (n *LocalNode) Invoke(req *dslink.Request) {
 	prs, _ := pr.(string)
 	if !ok {
 		r.Error = dslink.ErrInvalidMethod
-		n.p.SendResponse(r)
+		n.provider.SendResponse(r)
 		return
 	}
 
 	permReq := dslink.PermType(prs)
 	if perm.Level() < permReq.Level() {
 		r.Error = dslink.ErrPermissionDenied
-		n.p.SendResponse(r)
+		n.provider.SendResponse(r)
 		return
 	}
 
@@ -318,7 +318,7 @@ func (n *LocalNode) Invoke(req *dslink.Request) {
 	if n.onInvoke == nil {
 		empty := []interface{}{}
 		r.Updates = append(r.Updates, empty)
-		n.p.SendResponse(r)
+		n.provider.SendResponse(r)
 		return
 	}
 	rType, _ := n.GetConfig(dslink.ConfigResult)
@@ -332,7 +332,7 @@ func (n *LocalNode) Invoke(req *dslink.Request) {
 		for u := range retChan {
 			r.Updates = append(r.Updates, u)
 		}
-		n.p.SendResponse(r)
+		n.provider.SendResponse(r)
 		return
 	}
 
@@ -354,7 +354,7 @@ func (n *LocalNode) Invoke(req *dslink.Request) {
 				r.Updates = append(r.Updates, u)
 			}
 			up = up[:0]
-			n.p.SendResponse(r)
+			n.provider.SendResponse(r)
 			r = dslink.NewResp(req.Rid)
 			//r.Stream = dslink.StreamOpen
 
@@ -369,7 +369,7 @@ func (n *LocalNode) Invoke(req *dslink.Request) {
 		for _, u := range up {
 			r.Updates = append(r.Updates, u)
 		}
-		n.p.SendResponse(r)
+		n.provider.SendResponse(r)
 	}
 }
 
@@ -407,13 +407,13 @@ func (n *LocalNode) EnableSet(perm dslink.PermType, onSet dslink.OnSetValue) {
 
 func NewNode(name string, provider *Provider) *LocalNode {
 	sn := &LocalNode{
-		name: name,
-		p:    provider,
-		attr: make(map[string]interface{}),
-		conf: make(map[dslink.NodeConfig]interface{}),
-		chld: make(map[string]*LocalNode),
-		sMu: sync.RWMutex{},
-		lMu: sync.RWMutex{},
+		name:     name,
+		provider: provider,
+		attr:     make(map[string]interface{}),
+		conf:     make(map[dslink.NodeConfig]interface{}),
+		chld:     make(map[string]*LocalNode),
+		sMu:      sync.RWMutex{},
+		lMu:      sync.RWMutex{},
 	}
 
 	sn.conf[dslink.ConfigIs] = "node"
