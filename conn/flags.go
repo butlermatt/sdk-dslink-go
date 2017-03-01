@@ -71,9 +71,7 @@ func parseFlags(c *config) {
 	c.token = token
 	c.rootPath = basePath
 	c.logFile = logFile
-	if logL == "" {
-		c.logLevel = log.DebugLevel
-	} else {
+	if logL != "" {
 		ll, err := log.ToLevel(logL)
 		c.logLevel = ll
 		if err != nil {
