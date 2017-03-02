@@ -176,6 +176,7 @@ func (l *Link) Start() {
 }
 
 func (l *Link) Stop() {
+	// TODO: This isn't stopping the link though
 	l.cl.Close()
 }
 

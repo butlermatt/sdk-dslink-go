@@ -19,42 +19,23 @@ func connected(l *conn.Link) {
 	req := l.GetRequester()
 
 	fmt.Println("In Connected")
-	go test("/downstream/Example", req)
+	testGetNode("/downstream/Example", req)
+	testListNode("/downstream/Example", req)
+
+	fmt.Println("Done all!")
+	l.Stop()
 }
 
-func test(path string, req *nodes.Requester) {
+func testGetNode(path string, req *nodes.Requester) {
 	n, err := req.GetRemoteNode(path)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 	} else {
 		printNode(n)
 		for _, k := range n.Children() {
-			go test(k.Path(), req)
+			testGetNode(k.Path(), req)
 		}
 	}
-
-	tl := time.After(time.Second * 5)
-	uChan := make(chan []interface{})
-	rid := req.List("/downstream/Example", uChan)
-	for {
-		select {
-		case up, ok := <-uChan:
-			if !ok {
-				uChan = nil
-			} else {
-				fmt.Printf("Update contains %d items\n", len(up))
-				for i, u := range up {
-					fmt.Printf("\t%d: %v\n", i, u)
-				}
-			}
-		case <-tl:
-			req.CloseRequest(rid)
-		}
-		if uChan == nil {
-			break
-		}
-	}
-	fmt.Println("Done")
 }
 
 func printNode(n *nodes.RemoteNode) {
@@ -73,5 +54,29 @@ func printNode(n *nodes.RemoteNode) {
 	fmt.Println("\tChildren:")
 	for k := range n.Children() {
 		fmt.Printf("\t\t%q\n", k)
+	}
+}
+
+func testListNode(path string, req *nodes.Requester) {
+	tl := time.After(time.Second * 5)
+	uChan := make(chan []interface{})
+	rid := req.List(path, uChan)
+	for {
+		select {
+		case up, ok := <-uChan:
+			if !ok {
+				uChan = nil
+			} else {
+				fmt.Printf("Update contains %d items\n", len(up))
+				for i, u := range up {
+					fmt.Printf("\t%d: %v\n", i, u)
+				}
+			}
+		case <-tl:
+			req.CloseRequest(rid)
+		}
+		if uChan == nil {
+			break
+		}
 	}
 }
