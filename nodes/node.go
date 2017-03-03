@@ -1,7 +1,6 @@
 package nodes
 
 import (
-	"errors"
 	"sync"
 	"github.com/butlermatt/dslink"
 	"github.com/butlermatt/dslink/log"
@@ -19,6 +18,7 @@ type LocalNode struct {
 	valType     dslink.ValueType
 	onInvoke    dslink.InvokeFn
 	columns     []map[string]interface{}
+	cMu	    sync.RWMutex
 	chld        map[string]*LocalNode
 	sMu         sync.RWMutex
 	subscribers []int32
@@ -58,24 +58,26 @@ func (n *LocalNode) SetConfig(name dslink.NodeConfig, value interface{}) {
 }
 
 func (n *LocalNode) Children() map[string]*LocalNode {
+	n.cMu.RLock()
+	defer n.cMu.RUnlock()
 	return n.chld
 }
 
 func (n *LocalNode) GetChild(name string) dslink.Node {
+	n.cMu.RLock()
+	defer n.cMu.RUnlock()
 	return n.chld[name]
 }
 
-func (n *LocalNode) AddChild(node dslink.Node) error {
-	sn, ok := node.(*LocalNode)
-	if !ok {
-		return errors.New("Can't add unknown node type")
-	}
-	sn.Parent = n
-	sn.path = n.path + "/" + sn.name
-	n.provider.AddNode(sn.path, sn)
-	n.chld[sn.name] = sn
+func (n *LocalNode) AddChild(nd *LocalNode) error {
+	nd.Parent = n
+	nd.path = n.path + "/" + nd.name
+	n.provider.AddNode(nd.path, nd)
+	n.cMu.Lock()
+	n.chld[nd.name] = nd
+	n.cMu.Unlock()
 
-	n.notifyList(sn.name, sn.ToMap())
+	n.notifyList(nd.name, nd.ToMap())
 
 	return nil
 }
@@ -88,10 +90,12 @@ func (n *LocalNode) Remove() {
 		p.RemoveChild(n.name)
 	}
 
+	n.cMu.Lock()
 	for name, c := range n.chld {
 		c.Remove()
 		delete(n.chld, name)
 	}
+	n.cMu.Unlock()
 
 	prov := n.provider
 	n.provider = nil
@@ -101,8 +105,10 @@ func (n *LocalNode) Remove() {
 }
 
 func (n *LocalNode) RemoveChild(name string) dslink.Node {
+	n.cMu.Lock()
 	nd := n.chld[name]
 	delete(n.chld, name)
+	n.cMu.Unlock()
 
 	if nd != nil {
 		nd.Remove()
@@ -165,9 +171,11 @@ func (n *LocalNode) List(request *dslink.Request) *dslink.Response {
 		r.AddUpdate(k, v)
 	}
 
+	n.cMu.RLock()
 	for name, nd := range n.chld {
 		r.AddUpdate(name, nd.ToMap())
 	}
+	n.cMu.RUnlock()
 
 	return r
 }
